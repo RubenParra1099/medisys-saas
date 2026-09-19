@@ -22,7 +22,7 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
 - `src/components/Sidebar.tsx`, `PortalTopBar.tsx`, `HeroBanner.tsx`,
   `DoctorProfileCard.tsx` — capa visual del panel administrativo y del portal público,
   estilo SaaS médico premium (paleta azul `#008BEA`, tarjetas blancas `rounded-3xl`).
-- `src/app/(dashboard)/panel/agenda/page.tsx` + `AgendaCitasTable.tsx` +
+- `src/app/(dashboard)/panel/agenda/page.tsx` + `CitasTable.tsx` +
   `ResumenAgendaCards.tsx` — Dashboard del médico: resumen ejecutivo (KPIs) y tabla de
   citas con acciones de confirmar/cancelar en un clic.
 - `src/app/api/dashboard/actualizar-estatus/route.ts` — endpoint que actualiza el

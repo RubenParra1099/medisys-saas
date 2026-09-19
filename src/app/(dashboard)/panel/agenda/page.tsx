@@ -1,4 +1,4 @@
-import { AgendaCitasTable } from '@/components/AgendaCitasTable';
+import { CitasTable } from '@/components/CitasTable';
 import { ResumenAgendaCards } from '@/components/ResumenAgendaCards';
 import type { Cita } from '@/types';
 import { calcularResumenAgenda } from '@/utils/agenda';
@@ -54,7 +54,7 @@ export default async function AgendaPage() {
         ingresosEstimadosMes={resumen.ingresosEstimadosMes}
       />
 
-      <AgendaCitasTable citasIniciales={citas} />
+      <CitasTable citasIniciales={citas} />
     </main>
   );
 }
