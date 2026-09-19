@@ -22,10 +22,51 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
 - `src/components/Sidebar.tsx`, `PortalTopBar.tsx`, `HeroBanner.tsx`,
   `DoctorProfileCard.tsx` — capa visual del panel administrativo y del portal público,
   estilo SaaS médico premium (paleta azul `#008BEA`, tarjetas blancas `rounded-3xl`).
+- `src/app/(dashboard)/panel/agenda/page.tsx` + `AgendaCitasTable.tsx` +
+  `ResumenAgendaCards.tsx` — Dashboard del médico: resumen ejecutivo (KPIs) y tabla de
+  citas con acciones de confirmar/cancelar en un clic.
+- `src/app/api/dashboard/actualizar-estatus/route.ts` — endpoint que actualiza el
+  estatus de una cita en Google Sheets y dispara la alerta al paciente (ver
+  "Dashboard del médico" abajo).
+- `src/utils/citasRepository.ts`, `agenda.ts`, `session.ts` — acceso a la pestaña
+  "Citas", cálculo de los KPIs y resolución (placeholder) del médico en sesión.
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
   esté pendiente.
+
+## Dashboard del médico (`/panel/agenda`)
+
+Lee la pestaña "Citas" filtrando por el `id_medico` en sesión y muestra tres KPIs:
+
+- **Total de Citas del Mes**: todas las citas (cualquier estatus) cuya fecha cae en el
+  mes actual.
+- **Citas Pendientes por Confirmar**: citas con estatus `Pendiente`, sin filtrar por
+  mes — el médico debe verlas todas, agendadas para cuando sea.
+- **Ingresos Estimados del Mes**: número de citas `Confirmada` del mes × la tarifa de
+  consulta del médico (`medico.precio_consulta`).
+
+Cada cita `Pendiente` tiene dos botones de acción (✓ confirmar, ✕ cancelar) que llaman
+a `POST /api/dashboard/actualizar-estatus` con `{ id_cita, estatus }`. El endpoint:
+
+1. Localiza la fila por `id_cita` y escribe la columna H (estatus) con el helper
+   `actualizarCelda` del cliente JWT.
+2. Dispara — sin esperarla (`fire-and-forget`, igual que en `crear-cita`) — la alerta
+   correspondiente al paciente por WhatsApp/correo: "Tu cita con el Dr. [Nombre] ha
+   sido CONFIRMADA" al confirmar, o un aviso de cancelación si se cancela (este
+   segundo caso no se pidió explícitamente, pero se agregó porque el paciente
+   siempre debe saber si su cita fue cancelada).
+
+**Sesión del médico (placeholder sin auth real)**: como todavía no hay login,
+`src/utils/session.ts` resuelve el `id_medico` activo desde la cookie
+`id_medico_sesion` o la variable de entorno `DEMO_ID_MEDICO`. Configura esta última en
+Vercel (o en `.env.local`) para poder ver el dashboard mientras se integra
+autenticación real (NextAuth/Auth.js, Clerk, etc.) — el layout del panel ya tiene el
+`TODO` marcado en el lugar exacto donde debe ir ese guard.
+
+**Nota de rendimiento**: `listarCitasPorMedico` está envuelta en `cache()` de React,
+por lo que el layout (contador del Sidebar) y la página de Agenda comparten una sola
+lectura a Google Sheets por petición en vez de duplicarla.
 
 ## Columnas opcionales recomendadas en "Medicos"
 

@@ -247,3 +247,73 @@ export async function enviarNotificacionesCitaConfirmada(cita: Cita): Promise<vo
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// Alertas del dashboard del médico ("The Talkie" — confirmar/cancelar)
+// ---------------------------------------------------------------------------
+
+/** Registra en consola cualquier tarea de notificación que falle, sin relanzar. */
+async function registrarResultados(tareas: Promise<void>[], etiqueta: string): Promise<void> {
+  const resultados = await Promise.allSettled(tareas);
+  resultados.forEach((resultado, indice) => {
+    if (resultado.status === 'rejected') {
+      console.error(`[notifications] ${etiqueta} #${indice} falló:`, resultado.reason);
+    }
+  });
+}
+
+/**
+ * Alerta al paciente cuando el MÉDICO confirma manualmente una cita
+ * "Pendiente" desde el dashboard (distinta del correo de "reserva creada"
+ * que ya se envía en `crear-cita/route.ts`). Mensaje pedido explícitamente
+ * por el negocio: "Tu cita con el Dr. [Nombre] ha sido CONFIRMADA".
+ */
+export async function enviarAlertaCitaConfirmadaPorMedico(cita: Cita, nombreMedico: string): Promise<void> {
+  const mensajeWhatsApp =
+    `Hola ${cita.nombre_paciente}! Tu cita con el Dr. ${nombreMedico} ha sido CONFIRMADA ` +
+    `para el ${cita.fecha} a las ${cita.hora} hrs. Folio: ${cita.id_cita}.`;
+
+  const htmlCorreo = envolturaCorreo(`
+    <h2 style="margin:0 0 16px;color:#008BEA;">¡Tu cita ha sido CONFIRMADA!</h2>
+    <p>Hola <strong>${cita.nombre_paciente}</strong>, el Dr. ${nombreMedico} confirmó tu cita:</p>
+    <table role="presentation" width="100%" cellpadding="8" style="margin:16px 0;background-color:#f9fafb;border-radius:8px;">
+      <tr><td style="color:#6b7280;">Fecha</td><td><strong>${cita.fecha}</strong></td></tr>
+      <tr><td style="color:#6b7280;">Hora</td><td><strong>${cita.hora} hrs</strong></td></tr>
+      <tr><td style="color:#6b7280;">Folio</td><td><strong>${cita.id_cita}</strong></td></tr>
+    </table>
+  `);
+
+  await registrarResultados(
+    [
+      enviarWhatsApp(cita.telefono_paciente, mensajeWhatsApp),
+      enviarCorreo(cita.correo_paciente, 'Tu cita fue confirmada', htmlCorreo),
+    ],
+    'Alerta de confirmación',
+  );
+}
+
+/**
+ * Alerta al paciente cuando el médico cancela una cita desde el dashboard.
+ * No pedida explícitamente en el requerimiento original, pero se agrega por
+ * consistencia: el paciente siempre debe saber si su cita fue cancelada.
+ */
+export async function enviarAlertaCitaCanceladaPorMedico(cita: Cita, nombreMedico: string): Promise<void> {
+  const mensajeWhatsApp =
+    `Hola ${cita.nombre_paciente}, lamentamos informarte que tu cita con el Dr. ${nombreMedico} ` +
+    `del ${cita.fecha} a las ${cita.hora} hrs fue CANCELADA. Contáctanos para reprogramar.`;
+
+  const htmlCorreo = envolturaCorreo(`
+    <h2 style="margin:0 0 16px;color:#dc2626;">Tu cita fue cancelada</h2>
+    <p>Hola <strong>${cita.nombre_paciente}</strong>, tu cita con el Dr. ${nombreMedico} programada para el
+      ${cita.fecha} a las ${cita.hora} hrs fue cancelada.</p>
+    <p>Si deseas reprogramar, contáctanos o agenda una nueva cita desde nuestro portal.</p>
+  `);
+
+  await registrarResultados(
+    [
+      enviarWhatsApp(cita.telefono_paciente, mensajeWhatsApp),
+      enviarCorreo(cita.correo_paciente, 'Tu cita fue cancelada', htmlCorreo),
+    ],
+    'Alerta de cancelación',
+  );
+}
