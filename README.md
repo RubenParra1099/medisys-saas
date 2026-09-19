@@ -22,20 +22,33 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
 - `src/components/Sidebar.tsx`, `PortalTopBar.tsx`, `HeroBanner.tsx`,
   `DoctorProfileCard.tsx` — capa visual del panel administrativo y del portal público,
   estilo SaaS médico premium (paleta azul `#008BEA`, tarjetas blancas `rounded-3xl`).
-- `src/app/(dashboard)/panel/agenda/page.tsx` + `CitasTable.tsx` +
-  `ResumenAgendaCards.tsx` — Dashboard del médico: resumen ejecutivo (KPIs) y tabla de
-  citas con acciones de confirmar/cancelar en un clic.
+- `src/app/(dashboard)/dashboard/page.tsx` + `CitasTable.tsx` +
+  `ResumenAgendaCards.tsx` — Dashboard del médico (ruta pública unificada: `/dashboard`):
+  resumen ejecutivo (KPIs) y tabla de citas con acciones de confirmar/cancelar en un
+  clic.
 - `src/app/api/dashboard/actualizar-estatus/route.ts` — endpoint que actualiza el
   estatus de una cita en Google Sheets y dispara la alerta al paciente (ver
   "Dashboard del médico" abajo).
 - `src/utils/citasRepository.ts`, `agenda.ts`, `session.ts` — acceso a la pestaña
   "Citas", cálculo de los KPIs y resolución (placeholder) del médico en sesión.
+- `scripts/test-conexion-sheets.mjs` + `src/app/api/debug/estado-sheets/route.ts` —
+  herramientas de diagnóstico para encontrar la causa exacta de un 401/403 contra
+  Google Sheets, en local y en el propio despliegue de Vercel (ver sección
+  "Diagnóstico de conexión a Google Sheets" abajo).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
   esté pendiente.
 
-## Dashboard del médico (`/panel/agenda`)
+## Dashboard del médico (`/dashboard`)
+
+> **Historial de rutas**: esta vista vivió inicialmente en `/panel/agenda`, con
+> `/panel` como raíz de todo el panel administrativo. Se unificó a `/dashboard`
+> (carpeta `src/app/(dashboard)/dashboard/`) para que coincida con la ruta con la
+> que ya está configurado el proyecto en Vercel — la vista de Agenda ahora es el
+> `page.tsx` raíz de `/dashboard`, y el resto de secciones del Sidebar (antes bajo
+> `/panel/...`) se movieron a `/dashboard/...` en bloque para no romper la
+> navegación (ej. `/dashboard/pacientes`, `/dashboard/whatsapp`).
 
 Lee la pestaña "Citas" filtrando por el `id_medico` en sesión y muestra tres KPIs:
 
@@ -61,12 +74,82 @@ a `POST /api/dashboard/actualizar-estatus` con `{ id_cita, estatus }`. El endpoi
 `src/utils/session.ts` resuelve el `id_medico` activo desde la cookie
 `id_medico_sesion` o la variable de entorno `DEMO_ID_MEDICO`. Configura esta última en
 Vercel (o en `.env.local`) para poder ver el dashboard mientras se integra
-autenticación real (NextAuth/Auth.js, Clerk, etc.) — el layout del panel ya tiene el
-`TODO` marcado en el lugar exacto donde debe ir ese guard.
+autenticación real (NextAuth/Auth.js, Clerk, etc.) — `src/app/(dashboard)/dashboard/layout.tsx`
+ya tiene el `TODO` marcado en el lugar exacto donde debe ir ese guard.
 
 **Nota de rendimiento**: `listarCitasPorMedico` está envuelta en `cache()` de React,
 por lo que el layout (contador del Sidebar) y la página de Agenda comparten una sola
 lectura a Google Sheets por petición en vez de duplicarla.
+
+## Diagnóstico de conexión a Google Sheets (401 / 403 en producción)
+
+No tengo acceso directo al dashboard de Vercel ni a sus logs en vivo (no hay un
+conector de Vercel disponible en este entorno), así que en vez de eso te dejo
+dos herramientas para que tú mismo encuentres la causa exacta en minutos —
+más una guía para revisar los logs manualmente.
+
+### 1. Script local — prueba contra tus variables de entorno actuales
+
+```bash
+# 1. Trae las variables REALES de Vercel a tu máquina (evita el clásico
+#    "en mi .env.local funciona, en Vercel no"):
+npx vercel env pull .env.local
+
+# 2. Instala dependencias (una sola vez):
+npm install
+
+# 3. Corre el diagnóstico:
+npm run diagnostico:sheets
+```
+
+El script revisa, en orden, y se detiene en el primer fallo con una
+explicación en español de la causa más probable:
+
+1. Que `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` y `GOOGLE_SHEET_ID`
+   existan y tengan el formato correcto (llave PEM completa, no truncada).
+2. Que la autenticación JWT con Google sea exitosa (esto es lo que se ve como
+   `401 Unauthorized` si falla).
+3. Que el spreadsheet sea accesible y tenga las pestañas `Medicos` y `Citas`
+   (esto es lo que se ve como `403 Forbidden` o `404` si falla).
+4. Que una lectura real de datos funcione (`Medicos!A2:B2`).
+
+### 2. Endpoint protegido — prueba contra el entorno REAL de Vercel
+
+El script local usa las variables que tú pegaste en tu máquina; pero el
+origen más común del problema es que **Vercel tiene variables distintas**
+(una llave pegada mal, un espacio de más, el ambiente "Preview" sin
+configurar, etc.). Para comprobar eso sin acceso a los logs:
+
+1. En Vercel → tu proyecto → Settings → Environment Variables, agrega
+   `DEBUG_SECRET` con un valor largo y aleatorio (ver `.env.example`) y
+   vuelve a desplegar.
+2. Visita (reemplazando tu dominio y el secreto):
+   `https://tu-proyecto.vercel.app/api/debug/estado-sheets?secret=TU_DEBUG_SECRET`
+3. Verás un JSON con un arreglo `diagnosticos`, un paso por cada prueba
+   (mismas 4 pruebas que el script), cada uno con `ok: true/false`,
+   un `detalle` legible y, si falló, `causasProbables`. Nunca se expone la
+   llave privada ni ningún secreto, solo longitudes y códigos de error.
+4. **Importante**: borra `DEBUG_SECRET` de Vercel (o la ruta del repositorio)
+   en cuanto termines de depurar — si la variable no existe, el endpoint se
+   autodesactiva y responde `404`.
+
+### 3. Revisar los logs en vivo de Vercel manualmente
+
+Como complemento (o si prefieres ver el error crudo tal como lo lanza
+`googleapis`):
+
+- **Desde el dashboard**: tu proyecto → pestaña **Deployments** → abre el
+  deployment activo → pestaña **Logs** (o **Functions** en despliegues más
+  viejos) → filtra por la función `api/booking/crear-cita` o
+  `api/dashboard/actualizar-estatus` → reproduce la acción (agenda o confirma
+  una cita) y observa el error en tiempo real.
+- **Desde la CLI**: `npx vercel logs <url-de-tu-deployment>` transmite los
+  logs en vivo a tu terminal.
+
+Busca líneas que empiecen con `[googleSheets]` — todos los errores de este
+proyecto contra Google Sheets se registran con ese prefijo, junto con el
+mensaje original de la API de Google (que normalmente ya trae "PERMISSION_DENIED",
+"invalid_grant", etc.).
 
 ## Columnas opcionales recomendadas en "Medicos"
 

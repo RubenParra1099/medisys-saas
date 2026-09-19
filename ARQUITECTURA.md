@@ -27,13 +27,15 @@ medisys-saas/
     │   │           └── page.tsx             # Perfil público + calendario de reserva
     │   │
     │   ├── (dashboard)/                     # Grupo de rutas privadas (médico autenticado)
-    │   │   └── panel/
-    │   │       ├── layout.tsx               # Layout con guard de sesión/suscripción
-    │   │       ├── page.tsx                 # Resumen / KPIs del médico
-    │   │       ├── agenda/
-    │   │       │   └── page.tsx             # Gestión de horario_config y citas
-    │   │       └── suscripcion/
-    │   │           └── page.tsx             # Estado de plan_suscripcion y estatus_pago
+    │   │   └── dashboard/                   # Ruta unificada con la config real de Vercel
+    │   │       ├── layout.tsx               # Layout con guard de sesión/suscripción + Sidebar
+    │   │       ├── page.tsx                 # ✅ Agenda Médica: KPIs + <CitasTable /> (raíz de /dashboard)
+    │   │       ├── suscripcion/
+    │   │       │   └── page.tsx             # Estado de plan_suscripcion y estatus_pago
+    │   │       ├── pacientes/, documentos/, whatsapp/, recordatorios/,
+    │   │       │   consultorio/, correos/, odontograma/, cotizador/,
+    │   │       │   historial/, galeria/
+    │   │       │       └── page.tsx         # Stubs — secciones del Sidebar aún sin lógica
     │   │
     │   └── api/                             # Serverless Functions (Vercel)
     │       ├── booking/

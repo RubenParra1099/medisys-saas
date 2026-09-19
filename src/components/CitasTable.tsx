@@ -5,7 +5,7 @@ import { Check, Loader2, X } from 'lucide-react';
 import type { ApiRespuesta, Cita, EstatusCita } from '@/types';
 
 interface CitasTableProps {
-  /** Citas ya filtradas por médico, traídas server-side (ver `panel/agenda/page.tsx`). */
+  /** Citas ya filtradas por médico, traídas server-side (ver `(dashboard)/dashboard/page.tsx`). */
   citasIniciales: Cita[];
 }
 

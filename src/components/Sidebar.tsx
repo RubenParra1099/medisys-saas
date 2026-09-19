@@ -40,18 +40,18 @@ export function Sidebar({ idMedico, contadorAgendaHoy = 0, nombreClinica = 'Medi
   const pathname = usePathname();
 
   const seccionClinica: EnlaceNav[] = [
-    { etiqueta: 'Agenda Médica', href: '/panel/agenda', icono: CalendarClock, contador: contadorAgendaHoy },
-    { etiqueta: 'Odontograma IA', href: '/panel/odontograma', icono: Sparkles },
-    { etiqueta: 'Cotizador Presupuestos', href: '/panel/cotizador', icono: Calculator },
-    { etiqueta: 'Historial Clínico', href: '/panel/historial', icono: FileText },
-    { etiqueta: 'Galería Clínica', href: '/panel/galeria', icono: ImageIcon },
+    { etiqueta: 'Agenda Médica', href: '/dashboard', icono: CalendarClock, contador: contadorAgendaHoy },
+    { etiqueta: 'Odontograma IA', href: '/dashboard/odontograma', icono: Sparkles },
+    { etiqueta: 'Cotizador Presupuestos', href: '/dashboard/cotizador', icono: Calculator },
+    { etiqueta: 'Historial Clínico', href: '/dashboard/historial', icono: FileText },
+    { etiqueta: 'Galería Clínica', href: '/dashboard/galeria', icono: ImageIcon },
   ];
 
   const seccionGestion: EnlaceNav[] = [
-    { etiqueta: 'Pacientes', href: '/panel/pacientes', icono: Users },
-    { etiqueta: 'Documentos & Saldos', href: '/panel/documentos', icono: Wallet },
-    { etiqueta: 'Bot WhatsApp IA', href: '/panel/whatsapp', icono: MessageCircle },
-    { etiqueta: 'Recordatorios Citas', href: '/panel/recordatorios', icono: BellRing },
+    { etiqueta: 'Pacientes', href: '/dashboard/pacientes', icono: Users },
+    { etiqueta: 'Documentos & Saldos', href: '/dashboard/documentos', icono: Wallet },
+    { etiqueta: 'Bot WhatsApp IA', href: '/dashboard/whatsapp', icono: MessageCircle },
+    { etiqueta: 'Recordatorios Citas', href: '/dashboard/recordatorios', icono: BellRing },
     {
       etiqueta: 'Portal Reservas',
       href: idMedico ? `/medicos/${idMedico}` : '/buscar',
@@ -62,8 +62,8 @@ export function Sidebar({ idMedico, contadorAgendaHoy = 0, nombreClinica = 'Medi
   ];
 
   const seccionConfig: EnlaceNav[] = [
-    { etiqueta: 'Mi Consultorio', href: '/panel/consultorio', icono: Building2 },
-    { etiqueta: 'Correos Autorizados', href: '/panel/correos', icono: Mail },
+    { etiqueta: 'Mi Consultorio', href: '/dashboard/consultorio', icono: Building2 },
+    { etiqueta: 'Correos Autorizados', href: '/dashboard/correos', icono: Mail },
   ];
 
   function renderGrupo(titulo: string, enlaces: EnlaceNav[]) {
