@@ -63,6 +63,22 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   badges por tipo, y modal "Crear Cotización / Registrar Abono" que inserta en la
   pestaña "Saldos" de Google Sheets (ver sección "Cotizador de Presupuestos y Control
   de Abonos" abajo — reemplaza el marcador gris que antes vivía en esta misma ruta).
+- `src/app/(dashboard)/dashboard/consultorio/page.tsx` + `FormularioConsultorio.tsx`
+  + `src/utils/consultorioRepository.ts` + `src/app/api/consultorio/guardar/route.ts`
+  — Mi Consultorio: formulario premium de datos de contacto, dirección física, días
+  y horario de atención, guardado como upsert en la pestaña "Consultorios" de Google
+  Sheets (ver sección "Mi Consultorio" abajo).
+- `src/app/(dashboard)/dashboard/correos/page.tsx` + `ListaUsuariosAutorizados.tsx` +
+  `ModalInvitarUsuario.tsx` + `src/utils/usuariosAutorizadosRepository.ts` +
+  `src/app/api/usuarios-autorizados/invitar/route.ts` — Correos Autorizados: lista de
+  asistentes/socios invitados + modal para invitar nuevos, persistidos en la pestaña
+  "Usuarios_Autorizados" de Google Sheets (ver sección "Correos Autorizados" abajo).
+- `src/app/(dashboard)/dashboard/recordatorios/page.tsx` +
+  `MesaControlRecordatorios.tsx` + `src/components/ui/{ToggleSwitch,ToastFlotante}.tsx`
+  + `src/app/api/recordatorios/actualizar/route.ts` — Recordatorios de Citas: mesa de
+  control con interruptores de auto-guardado para elegir la anticipación de los
+  recordatorios automáticos, persistidos como columna JSON opcional en "Medicos" (ver
+  sección "Recordatorios de Citas" abajo).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -455,6 +471,144 @@ número finito mayor a 0.
 (existente) y el nuevo "Cotizador" (ícono `Wallet`), que navega a
 `/dashboard/documentos?id=<id_paciente>`.
 
+## Mi Consultorio (`/dashboard/consultorio`)
+
+Formulario premium para que el doctor edite los datos reales de contacto de su
+consultorio: nombre de la clínica, teléfono comercial, dirección física, días de
+atención y horario general. Se guarda de forma asíncrona (upsert) en la pestaña
+"Consultorios" de Google Sheets, con una alerta flotante de éxito/error al terminar.
+
+### ⚠️ Paso manual requerido en tu Google Sheet
+
+Crea una pestaña llamada exactamente **`Consultorios`** con estos encabezados en la
+Fila 1, en este orden exacto:
+
+| id_medico | nombre_clinica | telefono_comercial | direccion_fisica | dias_atencion | horas_atencion_json |
+|---|---|---|---|---|---|
+
+- **Relación 1 a 1 con "Medicos"**: a diferencia de "Pacientes"/"Saldos" (que son
+  append-only), esta pestaña tiene como máximo UNA fila por `id_medico`.
+  `guardarConsultorio` (`consultorioRepository.ts`) busca si ya existe una fila para
+  ese médico — si existe, la **sobrescribe completa** con el nuevo helper
+  `actualizarFila` (`googleSheets.ts`); si no existe, agrega una nueva.
+- `dias_atencion` se guarda como texto separado por comas, ej. `"lunes,martes,miercoles,jueves,viernes"`.
+- `horas_atencion_json` se guarda como `JSON.stringify({ horaApertura, horaCierre })`,
+  ej. `{"horaApertura":"09:00","horaCierre":"18:00"}` — mismo patrón ya usado para
+  `horario_config` en "Medicos" y `datos_dentales` en "Odontogramas".
+
+### Formulario (`FormularioConsultorio.tsx`, `'use client'`)
+
+Dos columnas en desktop: nombre de la clínica y teléfono comercial lado a lado,
+dirección física a ancho completo, selector de días de atención con botones tipo
+"chip" (Lun-Dom, selección múltiple), y dos campos `type="time"` para la hora de
+apertura y cierre. Valida en el cliente (feedback inmediato) con las mismas reglas
+que `POST /api/consultorio/guardar` valida del lado del servidor — incluyendo que
+`horaCierre` sea posterior a `horaApertura` y que haya al menos un día seleccionado.
+
+Al guardar con éxito, muestra `<ToastFlotante />` (`components/ui/`) — un toast
+genérico de éxito/error con título y mensaje configurables, primo del
+`ToastGuardado.tsx` del Odontograma pero reutilizable entre los 3 módulos nuevos de
+esta entrega.
+
+## Correos Autorizados (`/dashboard/correos`)
+
+> **Nota de precisión:** el enunciado de este módulo pedía la ruta
+> `src/app/(dashboard)/dashboard/correos-autorizados/page.tsx` — esa ruta no existe en
+> el proyecto. El ítem real del `Sidebar` llamado "Correos Autorizados" apunta a
+> `/dashboard/correos` (`{ etiqueta: 'Correos Autorizados', href: '/dashboard/correos',
+> icono: Mail }`), que era el stub gris genérico que sí existía — es esa ruta la que
+> se reemplazó, para que quede conectada al `Sidebar` real de inmediato (mismo
+> criterio ya aplicado con `/dashboard/documentos` en el Cotizador).
+
+Lista minimalista de los asistentes o socios invitados que pueden acceder al
+sistema, con un botón "Invitar Usuario" que abre un modal para capturar un nuevo
+correo y su rol.
+
+### ⚠️ Paso manual requerido en tu Google Sheet
+
+Crea una pestaña llamada exactamente **`Usuarios_Autorizados`** con estos
+encabezados en la Fila 1, en este orden exacto:
+
+| id_autorizacion | id_medico_principal | correo_invitado | rol |
+|---|---|---|---|
+
+- `id_autorizacion`: se autogenera con formato `INV-12345` (mismo esquema
+  colisión-verificada que `id_paciente`/`id_transaccion`).
+- `rol`: siempre uno de dos valores literales — `"Asistente"` o `"Socio"`.
+- Esta pestaña es **append-only** (como "Pacientes"/"Saldos"): cada invitación es
+  una fila nueva, nunca se sobrescribe una existente.
+
+### Lista + modal (`ListaUsuariosAutorizados.tsx` / `ModalInvitarUsuario.tsx`)
+
+La lista muestra el correo de cada invitado junto con un badge de su rol (azul para
+Asistente, verde con ícono de escudo para Socio). El modal "Invitar Usuario" captura
+el correo y el rol (dos botones grandes, uno por rol) y hace `POST` a
+`/api/usuarios-autorizados/invitar`; al terminar con éxito, el nuevo usuario se
+agrega a la lista local de inmediato (sin recargar la página), porque la respuesta
+del `POST` ya trae el registro completo recién creado.
+
+### API: `POST /api/usuarios-autorizados/invitar`
+
+Body esperado:
+
+```json
+{ "correoInvitado": "asistente@correo.com", "rol": "Asistente" }
+```
+
+Protegido por sesión (401 sin cookie firmada válida) — `id_medico_principal` se
+resuelve **siempre** del servidor, nunca del body.
+
+## Recordatorios de Citas (`/dashboard/recordatorios`)
+
+Mesa de control visual con interruptores (Tailwind puro, sin dependencias — ver
+`components/ui/ToggleSwitch.tsx`) para elegir con qué anticipación el sistema debe
+enviar recordatorios automáticos de citas, y un interruptor maestro para
+activar/desactivar todas las alertas de un solo golpe.
+
+> **Nota de alcance:** el enunciado de este módulo no especificó una pestaña nueva de
+> Google Sheets (a diferencia de "Consultorios" y "Usuarios_Autorizados", que sí se
+> pidieron explícitamente). Como esta preferencia es 1 a 1 con cada médico —igual que
+> `horario_config`—, se agregó como una columna JSON **opcional** más en "Medicos"
+> (columna **P**, `configuracion_recordatorios`), siguiendo el mismo patrón ya
+> establecido para las columnas J-M (`correo_contacto`, `cedula_profesional`, etc.).
+> **Ojo:** no es la columna N — las columnas N y O ya están reservadas para las
+> credenciales de login (`usuario_login`/`password_hash`, ver "Autenticación de
+> médicos" abajo), así que la nueva columna se agregó en P para no pisarlas. Si la
+> columna P no existe todavía, no se rompe nada — se usan los 3 interruptores
+> encendidos por defecto (`CONFIGURACION_RECORDATORIOS_POR_DEFECTO` en
+> `medicosRepository.ts`). Como se indicó al pedir este módulo, el envío real de
+> mensajes (WhatsApp/correo) todavía no existe — esta pantalla solo guarda la
+> *preferencia* que esas APIs externas usarán en el siguiente paso.
+
+### Interruptores (`MesaControlRecordatorios.tsx`, `'use client'`)
+
+- **Alertas Automáticas Activas** (interruptor maestro): si está apagado, ninguno de
+  los otros dos recordatorios se envía, sin importar su estado — pero apagarlo no
+  borra la selección de anticipación (los otros dos toggles solo se ven "apagados"
+  visualmente con `opacity-50` y se deshabilitan hasta que el maestro se reactive).
+- **Recordatorio 24 horas antes** / **Recordatorio 2 horas antes**: independientes
+  entre sí, pueden estar ambos activos, ambos inactivos, o solo uno.
+
+Cada interruptor se guarda de inmediato al cambiar (actualización optimista +
+`POST /api/recordatorios/actualizar` con el objeto de configuración **completo**, no
+solo el campo que cambió — así se evita que dos cambios casi simultáneos se pisen
+entre sí) — no hay un botón "Guardar" separado, como en una pantalla de ajustes
+típica. Si el `POST` falla, el interruptor se revierte a su valor anterior y aparece
+un toast de error.
+
+### API: `POST /api/recordatorios/actualizar`
+
+Body esperado (los 3 campos siempre completos):
+
+```json
+{ "recordatorio24hActivo": true, "recordatorio2hActivo": false, "alertasAutomaticasActivas": true }
+```
+
+Protegido por sesión (401 sin cookie firmada válida). Si el `id_medico` de la sesión
+no tiene todavía una fila en "Medicos" (perfil incompleto), responde `404` con un
+mensaje claro en vez de un error genérico — y la página muestra un estado vacío
+amigable en ese caso, en lugar de la mesa de control.
+
 ## Autenticación de médicos (`/login`)
 
 Sistema de login con usuario/contraseña que reemplaza por completo al placeholder
@@ -645,6 +799,10 @@ Además de las columnas A-I del esquema original, la UI usa estas columnas opcio
 | M | `calificacion` | Estrella dorada en la tarjeta de perfil (si falta, se muestra 5.0) |
 | N | `usuario_login` | Correo/usuario de acceso al dashboard (ver "Autenticación de médicos") |
 | O | `password_hash` | Hash bcrypt de la contraseña (o texto plano solo para pruebas) |
+| P | `configuracion_recordatorios` | Preferencias de recordatorios de citas, JSON (ver "Recordatorios de Citas") |
+
+> ⚠️ N y O están reservadas para las credenciales de login — **cualquier columna
+> nueva que se agregue a "Medicos" en el futuro debe empezar en P**, nunca antes.
 
 ## Estrategia anti-colisión (dos pacientes reservando el mismo horario)
 

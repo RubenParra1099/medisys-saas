@@ -44,8 +44,13 @@ medisys-saas/
     │   │       │       └── page.tsx         # ✅ Captura de Pacientes Nuevos (monta <FormularioNuevoPaciente />)
     │   │       ├── documentos/
     │   │       │   └── page.tsx             # ✅ Cotizador de Presupuestos y Control de Abonos (KPIs + <TablaMovimientos />)
-    │   │       ├── whatsapp/, recordatorios/,
-    │   │       │   consultorio/, correos/, cotizador/,
+    │   │       ├── consultorio/
+    │   │       │   └── page.tsx             # ✅ Mi Consultorio (monta <FormularioConsultorio />)
+    │   │       ├── correos/
+    │   │       │   └── page.tsx             # ✅ Correos Autorizados (monta <ListaUsuariosAutorizados />)
+    │   │       ├── recordatorios/
+    │   │       │   └── page.tsx             # ✅ Recordatorios de Citas (monta <MesaControlRecordatorios />)
+    │   │       ├── whatsapp/, cotizador/,
     │   │       │   historial/, galeria/
     │   │       │       └── page.tsx         # Stubs — secciones del Sidebar aún sin lógica
     │   │
@@ -75,12 +80,23 @@ medisys-saas/
     │       ├── saldos/
     │       │   └── crear/
     │       │       └── route.ts             # ✅ POST — inserta una fila en "Saldos" (cotización o abono)
+    │       ├── consultorio/
+    │       │   └── guardar/
+    │       │       └── route.ts             # ✅ POST — upsert de la fila del médico en "Consultorios"
+    │       ├── usuarios-autorizados/
+    │       │   └── invitar/
+    │       │       └── route.ts             # ✅ POST — inserta una fila en "Usuarios_Autorizados"
+    │       ├── recordatorios/
+    │       │   └── actualizar/
+    │       │       └── route.ts             # ✅ POST — sobrescribe columna P (JSON) de "Medicos" (N/O son login, intocables)
     │       └── webhooks/
     │           └── pagos/
     │               └── route.ts             # Stub — webhook de pasarela de pago (Stripe/Conekta)
     │
     ├── components/
-    │   ├── ui/                              # Design system (Button, Input, Card, Badge...)
+    │   ├── ui/                              # Design system compartido
+    │   │   ├── ToggleSwitch.tsx             # ✅ Interruptor visual reutilizable (Tailwind puro)
+    │   │   └── ToastFlotante.tsx            # ✅ Toast de éxito/error genérico (título+mensaje configurables)
     │   ├── booking/
     │   │   ├── CalendarioDisponibilidad.tsx
     │   │   └── FormularioReserva.tsx
@@ -102,12 +118,19 @@ medisys-saas/
     │   │   ├── hallazgosClinicos.ts          # separarHallazgos() + clasificarHallazgo() (badges de la tabla)
     │   │   ├── KpisPacientes.tsx             # 3 tarjetas ejecutivas (server component, sin 'use client')
     │   │   └── TablaPacientes.tsx            # Orquestador 'use client' — buscador + tabla clínica + acciones (Odontograma/Cotizador)
-    │   └── documentos/                       # ✅ Cotizador de Presupuestos y Control de Abonos
-    │       ├── tipos.ts                      # calcularResumenFinanciero() + ESTILOS_TIPO_MOVIMIENTO + formatearMoneda()
-    │       ├── KpisFinancieros.tsx           # 3 tarjetas ejecutivas (server component, sin 'use client')
-    │       ├── TablaMovimientos.tsx          # Orquestador 'use client' — tabla + botón que abre <ModalMovimiento />
-    │       ├── ModalMovimiento.tsx           # Modal a dos columnas — captura y POST de un nuevo movimiento
-    │       └── BuscadorPacienteFinanciero.tsx # Orquestador 'use client' — buscador/selector de paciente real
+    │   ├── documentos/                       # ✅ Cotizador de Presupuestos y Control de Abonos
+    │   │   ├── tipos.ts                      # calcularResumenFinanciero() + ESTILOS_TIPO_MOVIMIENTO + formatearMoneda()
+    │   │   ├── KpisFinancieros.tsx           # 3 tarjetas ejecutivas (server component, sin 'use client')
+    │   │   ├── TablaMovimientos.tsx          # Orquestador 'use client' — tabla + botón que abre <ModalMovimiento />
+    │   │   ├── ModalMovimiento.tsx           # Modal a dos columnas — captura y POST de un nuevo movimiento
+    │   │   └── BuscadorPacienteFinanciero.tsx # Orquestador 'use client' — buscador/selector de paciente real
+    │   ├── consultorio/                      # ✅ Mi Consultorio
+    │   │   └── FormularioConsultorio.tsx     # Orquestador 'use client' — estado + fetch upsert + toast
+    │   ├── correos/                          # ✅ Correos Autorizados
+    │   │   ├── ListaUsuariosAutorizados.tsx  # Orquestador 'use client' — lista + botón que abre <ModalInvitarUsuario />
+    │   │   └── ModalInvitarUsuario.tsx       # Modal — captura correo + rol y POST de la invitación
+    │   └── recordatorios/                    # ✅ Recordatorios de Citas
+    │       └── MesaControlRecordatorios.tsx  # Orquestador 'use client' — toggles con auto-guardado + toast
     │
     ├── hooks/
     │   ├── useDisponibilidad.ts             # Consume /api/booking/disponibilidad
@@ -122,6 +145,8 @@ medisys-saas/
         ├── odontogramaRepository.ts         # ✅ Acceso a datos de la pestaña "Odontogramas"
         ├── pacientesRepository.ts           # ✅ Acceso a datos de la pestaña "Pacientes"
         ├── saldosRepository.ts              # ✅ Acceso a datos de la pestaña "Saldos" (Cotizador)
+        ├── consultorioRepository.ts         # ✅ Acceso (upsert) a la pestaña "Consultorios"
+        ├── usuariosAutorizadosRepository.ts # ✅ Acceso a la pestaña "Usuarios_Autorizados"
         ├── edad.ts                          # ✅ calcularEdad() + sugerirDenticionPorEdad()
         ├── validation.ts                    # ✅ Validación estricta de inputs
         └── notifications.ts                 # ✅ WhatsApp (placeholder) + Email (Resend)

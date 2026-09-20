@@ -165,3 +165,29 @@ export async function actualizarCelda(rango: string, valor: string): Promise<voi
     throw new Error('No fue posible actualizar el registro en Google Sheets.');
   }
 }
+
+/**
+ * Actualiza varias celdas contiguas de UNA fila en una sola llamada, ej:
+ * `actualizarFila('Consultorios!B5:F5', ['Clínica Sonrisas', '871-123-4567', ...])`.
+ *
+ * Usada por flujos "upsert" en el lugar (una fila por entidad, ej.
+ * "Consultorios" con una fila por `id_medico`) donde reescribir toda la fila
+ * de un solo golpe es más simple y más barato en cuota de la API que llamar
+ * `actualizarCelda` columna por columna.
+ */
+export async function actualizarFila(rango: string, valores: (string | number)[]): Promise<void> {
+  const sheets = await obtenerClienteSheets();
+  const spreadsheetId = obtenerIdSpreadsheet();
+
+  try {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: rango,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [valores] },
+    });
+  } catch (error) {
+    console.error(`[googleSheets] Error actualizando fila "${rango}":`, error);
+    throw new Error('No fue posible actualizar el registro en Google Sheets.');
+  }
+}

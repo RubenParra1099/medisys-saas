@@ -57,6 +57,16 @@ export interface Medico {
   direccion?: string;
   /** Columna opcional recomendada (M), escala 0-5. Si no existe, la UI muestra 5.0. */
   calificacion?: number;
+  /**
+   * Columna opcional recomendada (P) — preferencias de recordatorios de
+   * citas (ver "Recordatorios de Citas" abajo). Si no existe o está
+   * corrupta, se usa `CONFIGURACION_RECORDATORIOS_POR_DEFECTO`
+   * (`medicosRepository.ts`).
+   *
+   * ⚠️ NO es la columna N: las columnas N y O de "Medicos" están reservadas
+   * para `usuario_login`/`password_hash` (ver `authRepository.ts`).
+   */
+  configuracion_recordatorios?: ConfiguracionRecordatorios;
 }
 
 /** Representa una fila de la pestaña "Citas". */
@@ -203,3 +213,91 @@ export interface CrearMovimientoFinancieroInput {
   monto: number;
   notas: string;
 }
+
+/**
+ * Horario general de atención del consultorio (independiente del
+ * `HorarioConfig` día-por-día de "Medicos", que rige la agenda de citas).
+ */
+export interface HorasAtencion {
+  /** Formato "HH:mm", 24 horas. Ej: "09:00" */
+  horaApertura: string;
+  /** Formato "HH:mm", 24 horas. Ej: "18:00" */
+  horaCierre: string;
+}
+
+/**
+ * Representa una fila de la pestaña "Consultorios" — configuración de "Mi
+ * Consultorio" (ver `src/utils/consultorioRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_medico`, `nombre_clinica`, `telefono_comercial`, `direccion_fisica`,
+ * `dias_atencion`, `horas_atencion_json`.
+ *
+ * Es una relación 1 a 1 con "Medicos" (una fila por `id_medico`) — a
+ * diferencia de "Citas"/"Pacientes"/"Saldos", que son append-only, esta
+ * pestaña se actualiza (upsert) en el lugar: `guardarConsultorio` sobrescribe
+ * la fila existente del médico en vez de agregar una nueva cada vez que
+ * guarda el formulario.
+ */
+export interface ConfiguracionConsultorio {
+  id_medico: string;
+  nombre_clinica: string;
+  telefono_comercial: string;
+  direccion_fisica: string;
+  /** Se guarda en la hoja como texto separado por comas, ej. "lunes,martes,miercoles". */
+  dias_atencion: DiaSemana[];
+  /** Se guarda en la hoja como `HorasAtencion` serializado con `JSON.stringify`. */
+  horas_atencion: HorasAtencion;
+}
+
+/** Payload que el formulario "Mi Consultorio" envía a `POST /api/consultorio/guardar`. */
+export interface GuardarConsultorioInput {
+  nombreClinica: string;
+  telefonoComercial: string;
+  direccionFisica: string;
+  diasAtencion: DiaSemana[];
+  horaApertura: string;
+  horaCierre: string;
+}
+
+/** Rol de un usuario invitado al sistema — nunca es el médico principal (dueño de la sesión). */
+export type RolUsuarioAutorizado = 'Asistente' | 'Socio';
+
+/**
+ * Representa una fila de la pestaña "Usuarios_Autorizados" — invitados con
+ * acceso al sistema (ver `src/utils/usuariosAutorizadosRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_autorizacion`, `id_medico_principal`, `correo_invitado`, `rol`.
+ */
+export interface UsuarioAutorizado {
+  /** Formato "INV-12345" (ver `generarIdAutorizacionUnico` en `usuariosAutorizadosRepository.ts`). */
+  id_autorizacion: string;
+  id_medico_principal: string;
+  correo_invitado: string;
+  rol: RolUsuarioAutorizado;
+}
+
+/** Payload que el modal "Invitar Usuario" envía a `POST /api/usuarios-autorizados/invitar`. */
+export interface InvitarUsuarioInput {
+  correoInvitado: string;
+  rol: RolUsuarioAutorizado;
+}
+
+/**
+ * Preferencias de recordatorios automáticos de citas — se guarda como una
+ * sola columna JSON (`configuracion_recordatorios_json`, columna N opcional
+ * de "Medicos") en vez de una columna booleana por interruptor, siguiendo el
+ * mismo criterio ya usado para `horario_config`: agregar un nuevo
+ * recordatorio en el futuro (ej. "1 semana antes") no requiere una migración
+ * de columnas.
+ */
+export interface ConfiguracionRecordatorios {
+  recordatorio24hActivo: boolean;
+  recordatorio2hActivo: boolean;
+  /** Interruptor maestro — si está apagado, no se envía ningún recordatorio sin importar los otros dos. */
+  alertasAutomaticasActivas: boolean;
+}
+
+/** Payload que la mesa de control envía a `POST /api/recordatorios/actualizar`. */
+export type ActualizarRecordatoriosInput = ConfiguracionRecordatorios;
