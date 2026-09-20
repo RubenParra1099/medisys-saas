@@ -113,8 +113,10 @@ export function FormularioNuevoPaciente() {
 
       // Redirige directo al odontograma del paciente recién creado — se
       // deja `enviando` en `true` a propósito (el botón sigue mostrando el
-      // spinner) hasta que la navegación reemplace esta página.
-      router.push(`/dashboard/odontograma?paciente=${encodeURIComponent(cuerpo.data.idPaciente)}`);
+      // spinner) hasta que la navegación reemplace esta página. `?id=` es
+      // el mismo query param canónico que usa el botón "Ver Odontograma"
+      // de la tabla de pacientes (`TablaPacientes.tsx`).
+      router.push(`/dashboard/odontograma?id=${encodeURIComponent(cuerpo.data.idPaciente)}`);
     } catch (error) {
       console.error('[FormularioNuevoPaciente] Error de red registrando al paciente:', error);
       setErrorGeneral('No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.');

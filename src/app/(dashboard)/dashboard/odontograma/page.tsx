@@ -17,14 +17,19 @@ import { obtenerIdMedicoSesion } from '@/utils/session';
  * historial clínico real, sin depender de un `fetch` desde el cliente para
  * la primera pintura de la página.
  *
- * PACIENTE REAL vía `?paciente=<id_paciente>`: el formulario "Captura de
- * Pacientes Nuevos" (`/dashboard/pacientes/nuevo`) redirige aquí con ese
- * query param al registrar a alguien. Si viene y corresponde a un paciente
- * real (pestaña "Pacientes"), se usa como paciente inicial — la dentición
- * sugerida se calcula a partir de su fecha de nacimiento
- * (`sugerirDenticionPorEdad`). Si no viene, o el id no existe, se cae al
- * primer paciente de la lista de demostración (`PACIENTES_DEMO`), igual que
- * antes de este paso.
+ * PACIENTE REAL vía `?id=<id_paciente>` (o, como alias retrocompatible,
+ * `?paciente=<id_paciente>`): tanto el botón "Ver Odontograma" de la tabla
+ * de pacientes (`TablaPacientes.tsx`) como el formulario "Captura de
+ * Pacientes Nuevos" (`/dashboard/pacientes/nuevo`) redirigen aquí con ese
+ * query param. Si viene y corresponde a un paciente real (pestaña
+ * "Pacientes"), se usa como paciente inicial — la dentición sugerida se
+ * calcula a partir de su fecha de nacimiento (`sugerirDenticionPorEdad`).
+ * Si no viene, o el id no existe, se cae al primer paciente de la lista de
+ * demostración (`PACIENTES_DEMO`).
+ *
+ * `?id=` es el nombre canónico (así lo usan ambos flujos actuales); se
+ * sigue aceptando `?paciente=` únicamente por compatibilidad con enlaces ya
+ * generados por versiones anteriores de este módulo.
  *
  * La protección de sesión y el `<PanelShell />` (sidebar + layout
  * responsivo) ya los provee `dashboard/layout.tsx`; el `redirect` de abajo
@@ -37,7 +42,7 @@ import { obtenerIdMedicoSesion } from '@/utils/session';
 export const dynamic = 'force-dynamic';
 
 interface OdontogramaPageProps {
-  searchParams: { paciente?: string };
+  searchParams: { id?: string; paciente?: string };
 }
 
 export default async function OdontogramaPage({ searchParams }: OdontogramaPageProps) {
@@ -47,7 +52,7 @@ export default async function OdontogramaPage({ searchParams }: OdontogramaPageP
     redirect('/login');
   }
 
-  const idPacienteReal = searchParams.paciente?.trim();
+  const idPacienteReal = searchParams.id?.trim() || searchParams.paciente?.trim();
   let pacienteInicial: PacienteOdontograma = PACIENTES_DEMO[0];
 
   if (idPacienteReal) {
@@ -66,7 +71,7 @@ export default async function OdontogramaPage({ searchParams }: OdontogramaPageP
       };
     } else {
       console.warn(
-        `[OdontogramaPage] ?paciente=${idPacienteReal} no corresponde a ningún paciente real registrado — ` +
+        `[OdontogramaPage] id_paciente="${idPacienteReal}" no corresponde a ningún paciente real registrado — ` +
           'se usa el paciente de demostración por defecto.',
       );
     }

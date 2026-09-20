@@ -51,6 +51,11 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   (persistidos en la pestaña "Pacientes" de Google Sheets), que redirige al terminar
   directo al odontograma del paciente recién creado (ver sección "Captura de
   Pacientes Nuevos" abajo).
+- `src/app/(dashboard)/dashboard/pacientes/page.tsx` + `KpisPacientes.tsx` +
+  `TablaPacientes.tsx` + `hallazgosClinicos.ts` — Listado de Pacientes: 3 KPIs
+  ejecutivos, buscador en tiempo real, y tabla clínica con badges de color dinámico
+  por alergia/condición y acceso directo al odontograma de cada paciente (ver sección
+  "Listado de Pacientes" abajo).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -207,24 +212,36 @@ async liviano: la protección de sesión y el `<PanelShell />` ya los provee
 `dashboard/layout.tsx`; lo único que agrega esta página es la lectura inicial del
 historial del primer paciente antes de montar `<OdontogramaModule />`.
 
-**Paciente real vía `?paciente=<id_paciente>`**: cuando el formulario de "Captura de
-Pacientes Nuevos" (siguiente sección) registra a alguien, redirige aquí con ese query
-param — `page.tsx` busca ese `id_paciente` en la pestaña "Pacientes" y, si existe, lo
-usa como paciente inicial (con la dentición sugerida calculada de su fecha de
-nacimiento vía `sugerirDenticionPorEdad`, en `src/utils/edad.ts`). Si el id no viene o
-no corresponde a ningún paciente real, cae al primer paciente de `PACIENTES_DEMO`,
-igual que antes. **Limitación conocida**: el buscador de pacientes dentro del módulo
-(`BuscadorPacientes.tsx`) todavía solo busca sobre `PACIENTES_DEMO` — un paciente real
-recién registrado no aparece ahí todavía si el dentista navega a otra pantalla y
-regresa sin el query param; para volver a abrir su odontograma hay que repetir la URL
-`/dashboard/odontograma?paciente=<su id_paciente>` (ej. desde un futuro listado en
-`/dashboard/pacientes`, que ya tiene `listarPacientesPorMedico()` listo en
-`pacientesRepository.ts` para alimentarlo).
+**Paciente real vía `?id=<id_paciente>`** (alias retrocompatible: `?paciente=`):
+tanto el botón "Ver Odontograma" del listado de pacientes (siguiente sección) como el
+formulario "Captura de Pacientes Nuevos" redirigen aquí con ese query param —
+`page.tsx` busca ese `id_paciente` en la pestaña "Pacientes" y, si existe, lo usa como
+paciente inicial (con la dentición sugerida calculada de su fecha de nacimiento vía
+`sugerirDenticionPorEdad`, en `src/utils/edad.ts`). Si el id no viene o no corresponde
+a ningún paciente real, cae al primer paciente de `PACIENTES_DEMO`.
+
+**Limitación conocida que persiste**: el buscador *dentro* del módulo de odontograma
+(`BuscadorPacientes.tsx`, el que aparece junto al botón "Guardar Evolución") todavía
+solo busca sobre `PACIENTES_DEMO` — no sobre pacientes reales. Ya no es un problema
+práctico para llegar al odontograma de alguien (el listado de `/dashboard/pacientes`
+resuelve eso con el botón "Ver Odontograma"), pero si el dentista cambia de paciente
+usando ESE buscador interno mientras ya está dentro del módulo, solo puede elegir
+entre los 5 de demostración — unificar ambos buscadores es el siguiente paso natural.
 
 ## Captura de Pacientes Nuevos (`/dashboard/pacientes/nuevo`)
 
 Formulario premium de alta de pacientes reales — el paso previo obligatorio antes de
 poder hacerles un odontograma con sentido clínico real.
+
+> **Nota de precisión**: este formulario es una página completa (`/dashboard/pacientes/nuevo`),
+> no un modal/diálogo emergente, y `antecedentes_medicos` es un solo campo de texto
+> libre (un `<textarea>`), no una lista de selectores estructurados de alergias y
+> condiciones. Ambas cosas funcionan y guardan correctamente en Google Sheets — la
+> tabla de la siguiente sección lee ese mismo texto libre y lo separa en "hallazgos"
+> individuales por coma/punto y coma/" y " (ver `hallazgosClinicos.ts`). Si más
+> adelante quieres selectores reales (cada alergia/condición como su propio checkbox
+> con severidad explícita), es un cambio puntual a `FormularioNuevoPaciente.tsx` +
+> la columna `antecedentes_medicos` — con gusto lo hago en el próximo paso.
 
 ### ⚠️ Paso manual requerido en tu Google Sheet
 
@@ -252,17 +269,18 @@ exacto:
    cookie de sesión firmada (nunca del body — mismo principio que en
    "Guardar Evolución"), inserta la fila en "Pacientes" y devuelve el `id_paciente`.
 4. Con la respuesta exitosa, el formulario redirige de inmediato a
-   `/dashboard/odontograma?paciente=<id_paciente>` — el dentista cae directo en el
+   `/dashboard/odontograma?id=<id_paciente>` — el dentista cae directo en el
    odontograma en blanco de ese paciente recién creado, listo para el primer
-   diagnóstico.
+   diagnóstico. `?id=` es el mismo query param canónico que usa el botón "Ver
+   Odontograma" de la tabla de pacientes (ver siguiente sección); `?paciente=` (el
+   nombre usado en el paso anterior) se sigue aceptando como alias retrocompatible.
 
 Estructura:
 
 - `src/utils/pacientesRepository.ts` — capa de acceso a la pestaña "Pacientes" (mismo
   patrón que `medicosRepository.ts`/`citasRepository.ts`/`odontogramaRepository.ts`):
   `crearPaciente(...)`, `obtenerPacientePorId(...)` y `listarPacientesPorMedico(...)`
-  (esta última todavía sin consumidor en la UI — queda lista para el futuro listado en
-  `/dashboard/pacientes`).
+  (esta última ya tiene consumidor: alimenta el listado de la siguiente sección).
 - `src/app/api/pacientes/crear/route.ts` (`POST`) — protegido por sesión (401 sin
   cookie válida), valida el body y llama a `crearPaciente(...)`.
 - `src/components/pacientes/CampoFormulario.tsx` — campo de formulario reutilizable
@@ -278,6 +296,67 @@ Estructura:
   `sugerirDenticionPorEdad(edad)`, compartidas entre este formulario (para mostrar/
   calcular en el futuro) y `dashboard/odontograma/page.tsx` (para sugerir dentición
   adulta/infantil de un paciente real al abrir su odontograma).
+
+## Listado de Pacientes (`/dashboard/pacientes`)
+
+Vista real del listado de pacientes registrados — lee en vivo la pestaña "Pacientes"
+en cada carga (`export const dynamic = 'force-dynamic'`), calcula 3 KPIs ejecutivos, y
+muestra una tabla clínica con badges de color por alergia/condición y acceso directo
+al odontograma de cada paciente.
+
+### KPIs
+
+- **Total de Pacientes**: `pacientes.length` sobre el listado completo del médico en
+  sesión.
+- **Nuevos este Mes**: cuenta `fecha_registro` cuyo prefijo `"YYYY-MM"` coincide con el
+  mes actual.
+- **Pacientes con Alergias Críticas**: criterio literal pedido — cuenta filas donde
+  `antecedentes_medicos` no está vacío. No distingue todavía severidad real (ese
+  matiz sí existe, pero solo a nivel visual, en los badges de la tabla — ver abajo).
+
+Los 3 KPIs se calculan en `page.tsx` sobre el listado **completo** traído de Sheets,
+no sobre el resultado filtrado por el buscador — para que siempre reflejen los
+totales reales.
+
+### Buscador + tabla (`TablaPacientes.tsx`, `'use client'`)
+
+El buscador (ícono `Search` de `lucide-react`) filtra en tiempo real, en el navegador,
+por nombre completo O por cualquier hallazgo de alergia/condición — sin ningún
+`fetch` adicional, sobre el listado que ya trajo el servidor.
+
+Columnas: **ID** (badge mono), **Nombre Completo**, **Teléfono/WhatsApp** (número con
+link `tel:` + botón redondo que abre `https://wa.me/<dígitos>`), **Correo Electrónico**
+(link `mailto:` o un guión si el paciente no dejó correo), **Alergias/Condiciones**
+(ver abajo) y **Acciones** (botón "Ver Odontograma").
+
+**Columna "Alergias/Condiciones"** (`hallazgosClinicos.ts`): como `antecedentes_medicos`
+es hoy un solo campo de texto libre (ver la nota de precisión en la sección anterior),
+esta columna separa ese texto en fragmentos por coma/punto y coma/" y " y clasifica
+cada fragmento por coincidencia de palabras clave (heurística de presentación, no un
+catálogo clínico cerrado):
+
+- **Rojo** (`alergia`) — contiene una palabra como "penicilina", "AINEs", "ibuprofeno",
+  "látex", "mariscos", "alergia"/"alérgico", etc.
+- **Amarillo** (`condicion`) — contiene una palabra como "hipertensión", "diabetes",
+  "asma", "embarazo", "anticoagulante", etc.
+- **Gris neutro** (`otro`) — cualquier otro texto que no matchea ninguna palabra clave
+  (se muestra igual, solo sin urgencia visual).
+- **Verde "Sin antecedentes"** — cuando `antecedentes_medicos` viene vacío.
+
+**Columna "Acciones"**: el botón "Ver Odontograma" navega a
+`/dashboard/odontograma?id=<id_paciente>`. Usa el ícono `Sparkles` de `lucide-react`
+—la versión de `lucide-react` fijada en este proyecto (`0.475.0`) no incluye un ícono
+literal de diente/muela, así que se reutilizó el mismo ícono que ya representa
+"Odontograma IA" en el `Sidebar`, por consistencia visual, en vez de forzar un glifo
+no relacionado.
+
+### Página (`page.tsx`)
+
+Server component async: `obtenerIdMedicoSesion()` + `redirect('/login')` de sobra
+(defensa en profundidad, igual que el resto de `/dashboard/*`), `listarPacientesPorMedico(idMedico)`
+para traer el listado (con `.catch()` que degrada a lista vacía si Sheets falla, en
+vez de tronar la página), cálculo de los 3 KPIs, y renderiza `<KpisPacientes />` +
+`<TablaPacientes />`.
 
 ## Autenticación de médicos (`/login`)
 

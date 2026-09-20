@@ -39,7 +39,7 @@ medisys-saas/
     │   │       ├── odontograma/
     │   │       │   └── page.tsx             # ✅ Odontograma IA (monta <OdontogramaModule />)
     │   │       ├── pacientes/
-    │   │       │   ├── page.tsx             # Stub + CTA "Registrar Paciente" → /nuevo
+    │   │       │   ├── page.tsx             # ✅ Listado real (KPIs + <TablaPacientes />)
     │   │       │   └── nuevo/
     │   │       │       └── page.tsx         # ✅ Captura de Pacientes Nuevos (monta <FormularioNuevoPaciente />)
     │   │       ├── documentos/, whatsapp/, recordatorios/,
@@ -91,9 +91,12 @@ medisys-saas/
     │   │   ├── HistorialEvolucion.tsx        # Bitácora textual de hallazgos de la sesión
     │   │   ├── ToastGuardado.tsx             # Alerta flotante de éxito/error al guardar
     │   │   └── OdontogramaModule.tsx         # Orquestador 'use client' — estado + fetch guardar/cargar
-    │   └── pacientes/                        # ✅ Captura de Pacientes Nuevos
+    │   └── pacientes/                        # ✅ Captura + Listado de Pacientes
     │       ├── CampoFormulario.tsx           # Campo reutilizable (label + ícono + input/textarea + error)
-    │       └── FormularioNuevoPaciente.tsx   # Orquestador 'use client' — estado + fetch + redirect
+    │       ├── FormularioNuevoPaciente.tsx   # Orquestador 'use client' — estado + fetch + redirect
+    │       ├── hallazgosClinicos.ts          # separarHallazgos() + clasificarHallazgo() (badges de la tabla)
+    │       ├── KpisPacientes.tsx             # 3 tarjetas ejecutivas (server component, sin 'use client')
+    │       └── TablaPacientes.tsx            # Orquestador 'use client' — buscador + tabla clínica
     │
     ├── hooks/
     │   ├── useDisponibilidad.ts             # Consume /api/booking/disponibilidad
