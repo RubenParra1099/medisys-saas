@@ -130,3 +130,37 @@ export interface RegistroOdontograma {
   datos_dentales: string;
   notas_evolucion: string;
 }
+
+/**
+ * Representa una fila de la pestaña "Pacientes" (Captura de Pacientes
+ * Nuevos — ver `src/utils/pacientesRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_paciente`, `id_medico`, `nombre_completo`, `telefono`, `correo`,
+ * `fecha_nacimiento`, `antecedentes_medicos`, `fecha_registro`.
+ */
+export interface Paciente {
+  /** Formato "PAC-12345" (ver `generarIdPacienteUnico` en `pacientesRepository.ts`). */
+  id_paciente: string;
+  id_medico: string;
+  nombre_completo: string;
+  telefono: string;
+  /** Puede venir vacío — no todo paciente proporciona correo. */
+  correo: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha_nacimiento: string;
+  /** Alergias/enfermedades relevantes. Puede venir vacío. */
+  antecedentes_medicos: string;
+  /** Formato "YYYY-MM-DD" — fecha en que se dio de alta el registro. */
+  fecha_registro: string;
+}
+
+/** Payload que el formulario de captura envía a `POST /api/pacientes/crear`. */
+export interface CrearPacienteInput {
+  nombreCompleto: string;
+  telefono: string;
+  correo: string;
+  /** Formato "YYYY-MM-DD". */
+  fechaNacimiento: string;
+  antecedentesMedicos: string;
+}

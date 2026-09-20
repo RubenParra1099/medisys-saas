@@ -206,18 +206,28 @@ export const ETIQUETAS_DENTICION: Record<TipoDenticion, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Pacientes de demostración (buscador)
+// Paciente activo del odontograma (buscador)
 // ---------------------------------------------------------------------------
 
-export interface PacienteDemo {
+/**
+ * Forma mínima que necesita el módulo de odontograma para operar sobre un
+ * paciente — la comparte tanto un paciente de la lista de demostración
+ * (`PACIENTES_DEMO`, usada como *fallback* cuando no se abre el módulo
+ * desde un paciente real) como un paciente real registrado en la pestaña
+ * "Pacientes" de Google Sheets (ver `pacientesRepository.ts`): `page.tsx`
+ * es quien adapta un `Paciente` real a esta misma forma antes de pasarlo a
+ * `<OdontogramaModule />`, así el resto del módulo no necesita saber de
+ * dónde vino el paciente.
+ */
+export interface PacienteOdontograma {
   id: string;
   nombre: string;
   edad: number;
   denticionSugerida: TipoDenticion;
 }
 
-/** Lista fija de pacientes de prueba — no proviene de Google Sheets. */
-export const PACIENTES_DEMO: PacienteDemo[] = [
+/** Lista fija de pacientes de prueba — no proviene de Google Sheets; es el fallback cuando no hay un paciente real seleccionado. */
+export const PACIENTES_DEMO: PacienteOdontograma[] = [
   { id: 'p1', nombre: 'María Fernanda López', edad: 34, denticionSugerida: 'adulta' },
   { id: 'p2', nombre: 'Carlos Alberto Ruiz', edad: 41, denticionSugerida: 'adulta' },
   { id: 'p3', nombre: 'Sofía Jiménez Ortega', edad: 7, denticionSugerida: 'infantil' },

@@ -38,7 +38,11 @@ medisys-saas/
     │   │       │   └── page.tsx             # Estado de plan_suscripcion y estatus_pago
     │   │       ├── odontograma/
     │   │       │   └── page.tsx             # ✅ Odontograma IA (monta <OdontogramaModule />)
-    │   │       ├── pacientes/, documentos/, whatsapp/, recordatorios/,
+    │   │       ├── pacientes/
+    │   │       │   ├── page.tsx             # Stub + CTA "Registrar Paciente" → /nuevo
+    │   │       │   └── nuevo/
+    │   │       │       └── page.tsx         # ✅ Captura de Pacientes Nuevos (monta <FormularioNuevoPaciente />)
+    │   │       ├── documentos/, whatsapp/, recordatorios/,
     │   │       │   consultorio/, correos/, cotizador/,
     │   │       │   historial/, galeria/
     │   │       │       └── page.tsx         # Stubs — secciones del Sidebar aún sin lógica
@@ -63,6 +67,9 @@ medisys-saas/
     │       │   │   └── route.ts             # ✅ POST — inserta un snapshot en "Odontogramas"
     │       │   └── [idPaciente]/
     │       │       └── route.ts             # ✅ GET — último snapshot guardado de un paciente
+    │       ├── pacientes/
+    │       │   └── crear/
+    │       │       └── route.ts             # ✅ POST — inserta una fila en "Pacientes"
     │       └── webhooks/
     │           └── pagos/
     │               └── route.ts             # Stub — webhook de pasarela de pago (Stripe/Conekta)
@@ -75,15 +82,18 @@ medisys-saas/
     │   ├── medicos/
     │   │   ├── TarjetaMedico.tsx
     │   │   └── PerfilMedico.tsx
-    │   └── odontograma/                     # ✅ Módulo de Odontograma IA — persistido en Google Sheets
-    │       ├── tipos.ts                     # Catálogos + saneamiento (sanearEstadoOdontograma)
-    │       ├── Diente.tsx                   # SVG de una pieza con sus 5 superficies clicables
-    │       ├── LeyendaTratamientos.tsx       # Panel lateral de tratamientos (Caries, Corona...)
-    │       ├── PopoverSuperficie.tsx         # Popover para aplicar diagnóstico a una superficie
-    │       ├── BuscadorPacientes.tsx         # Buscador sobre PACIENTES_DEMO
-    │       ├── HistorialEvolucion.tsx        # Bitácora textual de hallazgos de la sesión
-    │       ├── ToastGuardado.tsx             # Alerta flotante de éxito/error al guardar
-    │       └── OdontogramaModule.tsx         # Orquestador 'use client' — estado + fetch guardar/cargar
+    │   ├── odontograma/                     # ✅ Módulo de Odontograma IA — persistido en Google Sheets
+    │   │   ├── tipos.ts                     # Catálogos + saneamiento (sanearEstadoOdontograma)
+    │   │   ├── Diente.tsx                   # SVG de una pieza con sus 5 superficies clicables
+    │   │   ├── LeyendaTratamientos.tsx       # Panel lateral de tratamientos (Caries, Corona...)
+    │   │   ├── PopoverSuperficie.tsx         # Popover para aplicar diagnóstico a una superficie
+    │   │   ├── BuscadorPacientes.tsx         # Buscador sobre PACIENTES_DEMO (aún no sobre pacientes reales)
+    │   │   ├── HistorialEvolucion.tsx        # Bitácora textual de hallazgos de la sesión
+    │   │   ├── ToastGuardado.tsx             # Alerta flotante de éxito/error al guardar
+    │   │   └── OdontogramaModule.tsx         # Orquestador 'use client' — estado + fetch guardar/cargar
+    │   └── pacientes/                        # ✅ Captura de Pacientes Nuevos
+    │       ├── CampoFormulario.tsx           # Campo reutilizable (label + ícono + input/textarea + error)
+    │       └── FormularioNuevoPaciente.tsx   # Orquestador 'use client' — estado + fetch + redirect
     │
     ├── hooks/
     │   ├── useDisponibilidad.ts             # Consume /api/booking/disponibilidad
@@ -96,6 +106,8 @@ medisys-saas/
         ├── googleSheets.ts                  # ✅ Cliente autenticado + helpers CRUD
         ├── medicosRepository.ts             # ✅ Acceso a datos de la pestaña "Medicos"
         ├── odontogramaRepository.ts         # ✅ Acceso a datos de la pestaña "Odontogramas"
+        ├── pacientesRepository.ts           # ✅ Acceso a datos de la pestaña "Pacientes"
+        ├── edad.ts                          # ✅ calcularEdad() + sugerirDenticionPorEdad()
         ├── validation.ts                    # ✅ Validación estricta de inputs
         └── notifications.ts                 # ✅ WhatsApp (placeholder) + Email (Resend)
 ```

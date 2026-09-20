@@ -45,6 +45,12 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   dentición adulta/infantil), leyenda de tratamientos, bitácora de hallazgos de la
   sesión, y **persistencia real en la pestaña "Odontogramas" de Google Sheets** vía
   el botón "Guardar Evolución" (ver sección "Módulo de Odontograma IA" abajo).
+- `src/app/(dashboard)/dashboard/pacientes/nuevo/page.tsx` + `src/components/pacientes/*`
+  + `src/utils/pacientesRepository.ts` + `src/app/api/pacientes/crear/route.ts` —
+  Captura de Pacientes Nuevos: formulario premium de alta de pacientes reales
+  (persistidos en la pestaña "Pacientes" de Google Sheets), que redirige al terminar
+  directo al odontograma del paciente recién creado (ver sección "Captura de
+  Pacientes Nuevos" abajo).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -200,6 +206,78 @@ ambas protegidas por la misma cookie de sesión firmada que el resto de `/dashbo
 async liviano: la protección de sesión y el `<PanelShell />` ya los provee
 `dashboard/layout.tsx`; lo único que agrega esta página es la lectura inicial del
 historial del primer paciente antes de montar `<OdontogramaModule />`.
+
+**Paciente real vía `?paciente=<id_paciente>`**: cuando el formulario de "Captura de
+Pacientes Nuevos" (siguiente sección) registra a alguien, redirige aquí con ese query
+param — `page.tsx` busca ese `id_paciente` en la pestaña "Pacientes" y, si existe, lo
+usa como paciente inicial (con la dentición sugerida calculada de su fecha de
+nacimiento vía `sugerirDenticionPorEdad`, en `src/utils/edad.ts`). Si el id no viene o
+no corresponde a ningún paciente real, cae al primer paciente de `PACIENTES_DEMO`,
+igual que antes. **Limitación conocida**: el buscador de pacientes dentro del módulo
+(`BuscadorPacientes.tsx`) todavía solo busca sobre `PACIENTES_DEMO` — un paciente real
+recién registrado no aparece ahí todavía si el dentista navega a otra pantalla y
+regresa sin el query param; para volver a abrir su odontograma hay que repetir la URL
+`/dashboard/odontograma?paciente=<su id_paciente>` (ej. desde un futuro listado en
+`/dashboard/pacientes`, que ya tiene `listarPacientesPorMedico()` listo en
+`pacientesRepository.ts` para alimentarlo).
+
+## Captura de Pacientes Nuevos (`/dashboard/pacientes/nuevo`)
+
+Formulario premium de alta de pacientes reales — el paso previo obligatorio antes de
+poder hacerles un odontograma con sentido clínico real.
+
+### ⚠️ Paso manual requerido en tu Google Sheet
+
+Igual que con "Odontogramas", crea a mano una pestaña llamada **exactamente**
+`Pacientes` en tu spreadsheet, con estos encabezados en la **Fila 1**, en este orden
+exacto:
+
+| Columna | A | B | C | D | E | F | G | H |
+|---|---|---|---|---|---|---|---|---|
+| Encabezado | `id_paciente` | `id_medico` | `nombre_completo` | `telefono` | `correo` | `fecha_nacimiento` | `antecedentes_medicos` | `fecha_registro` |
+
+### Flujo
+
+1. El dentista llena el formulario (`FormularioNuevoPaciente.tsx`): nombre completo,
+   teléfono y fecha de nacimiento son requeridos; correo y antecedentes
+   médicos (alergias/enfermedades) son opcionales. Cada campo valida en el cliente
+   con las mismas reglas que el servidor (nombre ≥ 3 caracteres, teléfono con formato
+   razonable, correo con formato válido si se proporciona, fecha de nacimiento no
+   futura) — es solo una ayuda de UX; la validación vinculante ocurre en el servidor.
+2. Al hacer clic en "Registrar Paciente" (botón azul con degradado, ícono `UserPlus`
+   de `lucide-react` que cambia a un spinner `Loader2` mientras se guarda), se hace
+   `POST /api/pacientes/crear`.
+3. La API genera un `id_paciente` con formato `PAC-12345` (5 dígitos, verificado contra
+   los ids existentes en la hoja para evitar colisiones), resuelve `id_medico` de la
+   cookie de sesión firmada (nunca del body — mismo principio que en
+   "Guardar Evolución"), inserta la fila en "Pacientes" y devuelve el `id_paciente`.
+4. Con la respuesta exitosa, el formulario redirige de inmediato a
+   `/dashboard/odontograma?paciente=<id_paciente>` — el dentista cae directo en el
+   odontograma en blanco de ese paciente recién creado, listo para el primer
+   diagnóstico.
+
+Estructura:
+
+- `src/utils/pacientesRepository.ts` — capa de acceso a la pestaña "Pacientes" (mismo
+  patrón que `medicosRepository.ts`/`citasRepository.ts`/`odontogramaRepository.ts`):
+  `crearPaciente(...)`, `obtenerPacientePorId(...)` y `listarPacientesPorMedico(...)`
+  (esta última todavía sin consumidor en la UI — queda lista para el futuro listado en
+  `/dashboard/pacientes`).
+- `src/app/api/pacientes/crear/route.ts` (`POST`) — protegido por sesión (401 sin
+  cookie válida), valida el body y llama a `crearPaciente(...)`.
+- `src/components/pacientes/CampoFormulario.tsx` — campo de formulario reutilizable
+  (label + input/textarea con ícono de `lucide-react` incrustado + mensaje de error),
+  usado por los 5 campos del formulario.
+- `src/components/pacientes/FormularioNuevoPaciente.tsx` — orquestador `'use client'`
+  del formulario: estado de los 5 campos, validación, `fetch` a la API y redirección
+  final.
+- `src/app/(dashboard)/dashboard/pacientes/nuevo/page.tsx` — server component mínimo,
+  mismo patrón que el resto de `/dashboard/*` (guard de sesión de sobra + monta el
+  formulario de cliente).
+- `src/utils/edad.ts` — `calcularEdad(fechaNacimientoIso)` y
+  `sugerirDenticionPorEdad(edad)`, compartidas entre este formulario (para mostrar/
+  calcular en el futuro) y `dashboard/odontograma/page.tsx` (para sugerir dentición
+  adulta/infantil de un paciente real al abrir su odontograma).
 
 ## Autenticación de médicos (`/login`)
 
@@ -445,7 +523,12 @@ plantilla original; ver la sección "Módulo de Odontograma IA" arriba para el d
 completo:
 `id_odontograma | id_paciente | id_medico | fecha (YYYY-MM-DD) | datos_dentales (JSON) | notas_evolucion`
 
-La fila 1 de las tres pestañas debe ser encabezados (el código lee a partir de la fila 2).
+**Pestaña "Pacientes"** (columnas A–H) — **debes crearla a mano**, no viene en la
+plantilla original; ver la sección "Captura de Pacientes Nuevos" arriba para el
+detalle completo:
+`id_paciente (PAC-12345) | id_medico | nombre_completo | telefono | correo | fecha_nacimiento (YYYY-MM-DD) | antecedentes_medicos | fecha_registro (YYYY-MM-DD)`
+
+La fila 1 de las cuatro pestañas debe ser encabezados (el código lee a partir de la fila 2).
 
 ## Configuración de variables de entorno en Vercel
 

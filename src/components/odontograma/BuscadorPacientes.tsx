@@ -3,11 +3,11 @@
 import { useMemo, useState } from 'react';
 import { Search, User } from 'lucide-react';
 import { PACIENTES_DEMO } from '@/components/odontograma/tipos';
-import type { PacienteDemo } from '@/components/odontograma/tipos';
+import type { PacienteOdontograma } from '@/components/odontograma/tipos';
 
 interface BuscadorPacientesProps {
-  pacienteActivo: PacienteDemo;
-  onSeleccionar: (paciente: PacienteDemo) => void;
+  pacienteActivo: PacienteOdontograma;
+  onSeleccionar: (paciente: PacienteOdontograma) => void;
 }
 
 /**
@@ -27,7 +27,7 @@ export function BuscadorPacientes({ pacienteActivo, onSeleccionar }: BuscadorPac
     return PACIENTES_DEMO.filter((paciente) => paciente.nombre.toLowerCase().includes(texto));
   }, [consulta]);
 
-  function seleccionar(paciente: PacienteDemo) {
+  function seleccionar(paciente: PacienteOdontograma) {
     onSeleccionar(paciente);
     setConsulta('');
     setAbierto(false);

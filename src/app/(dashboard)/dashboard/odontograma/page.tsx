@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation';
 import { OdontogramaModule } from '@/components/odontograma/OdontogramaModule';
 import { PACIENTES_DEMO } from '@/components/odontograma/tipos';
+import type { PacienteOdontograma } from '@/components/odontograma/tipos';
+import { calcularEdad, sugerirDenticionPorEdad } from '@/utils/edad';
 import { obtenerUltimoOdontogramaPorPaciente } from '@/utils/odontogramaRepository';
+import { obtenerPacientePorId } from '@/utils/pacientesRepository';
 import { obtenerIdMedicoSesion } from '@/utils/session';
 
 /**
@@ -14,6 +17,15 @@ import { obtenerIdMedicoSesion } from '@/utils/session';
  * historial clínico real, sin depender de un `fetch` desde el cliente para
  * la primera pintura de la página.
  *
+ * PACIENTE REAL vía `?paciente=<id_paciente>`: el formulario "Captura de
+ * Pacientes Nuevos" (`/dashboard/pacientes/nuevo`) redirige aquí con ese
+ * query param al registrar a alguien. Si viene y corresponde a un paciente
+ * real (pestaña "Pacientes"), se usa como paciente inicial — la dentición
+ * sugerida se calcula a partir de su fecha de nacimiento
+ * (`sugerirDenticionPorEdad`). Si no viene, o el id no existe, se cae al
+ * primer paciente de la lista de demostración (`PACIENTES_DEMO`), igual que
+ * antes de este paso.
+ *
  * La protección de sesión y el `<PanelShell />` (sidebar + layout
  * responsivo) ya los provee `dashboard/layout.tsx`; el `redirect` de abajo
  * es defensa en profundidad (no debería ejecutarse nunca en producción),
@@ -24,19 +36,41 @@ import { obtenerIdMedicoSesion } from '@/utils/session';
  */
 export const dynamic = 'force-dynamic';
 
-export default async function OdontogramaPage() {
+interface OdontogramaPageProps {
+  searchParams: { paciente?: string };
+}
+
+export default async function OdontogramaPage({ searchParams }: OdontogramaPageProps) {
   const idMedico = obtenerIdMedicoSesion();
 
   if (!idMedico) {
     redirect('/login');
   }
 
-  // El módulo abre siempre con el primer paciente de la lista de
-  // demostración (`PACIENTES_DEMO`) — al cambiar de paciente desde el
-  // buscador, `OdontogramaModule.tsx` trae el historial de ESE paciente por
-  // su cuenta vía `GET /api/odontograma/:idPaciente` (no hay navegación de
-  // página en ese cambio, así que no puede resolverse aquí).
-  const pacienteInicial = PACIENTES_DEMO[0];
+  const idPacienteReal = searchParams.paciente?.trim();
+  let pacienteInicial: PacienteOdontograma = PACIENTES_DEMO[0];
+
+  if (idPacienteReal) {
+    const pacienteReal = await obtenerPacientePorId(idPacienteReal).catch((error) => {
+      console.error('[OdontogramaPage] No se pudo cargar el paciente real desde Google Sheets:', error);
+      return null;
+    });
+
+    if (pacienteReal) {
+      const edad = calcularEdad(pacienteReal.fecha_nacimiento);
+      pacienteInicial = {
+        id: pacienteReal.id_paciente,
+        nombre: pacienteReal.nombre_completo,
+        edad: edad ?? 0,
+        denticionSugerida: sugerirDenticionPorEdad(edad),
+      };
+    } else {
+      console.warn(
+        `[OdontogramaPage] ?paciente=${idPacienteReal} no corresponde a ningún paciente real registrado — ` +
+          'se usa el paciente de demostración por defecto.',
+      );
+    }
+  }
 
   const registroInicial = await obtenerUltimoOdontogramaPorPaciente(pacienteInicial.id).catch((error) => {
     console.error('[OdontogramaPage] No se pudo cargar el historial dental inicial desde Google Sheets:', error);

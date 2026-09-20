@@ -20,7 +20,7 @@ import type {
   EstadoOdontograma,
   EstadoSuperficies,
   HallazgoHistorial,
-  PacienteDemo,
+  PacienteOdontograma,
   Superficie,
   TipoDenticion,
   TratamientoId,
@@ -49,7 +49,7 @@ interface EstadoToast {
 
 interface OdontogramaModuleProps {
   /** Paciente con el que abre el módulo (el primero de la lista de demostración). */
-  pacienteInicial: PacienteDemo;
+  pacienteInicial: PacienteOdontograma;
   /**
    * Último odontograma real de `pacienteInicial`, ya leído de Google Sheets
    * por el Server Component (`page.tsx`) — evita un "parpadeo" de piezas
@@ -88,7 +88,7 @@ interface OdontogramaModuleProps {
  * `notas_evolucion` y las piezas quedan persistidas de verdad.
  */
 export function OdontogramaModule({ pacienteInicial, estadoInicial }: OdontogramaModuleProps) {
-  const [pacienteActivo, setPacienteActivo] = useState<PacienteDemo>(pacienteInicial);
+  const [pacienteActivo, setPacienteActivo] = useState<PacienteOdontograma>(pacienteInicial);
   const [tipoDenticion, setTipoDenticion] = useState<TipoDenticion>(pacienteInicial.denticionSugerida);
   const [tratamientoActivo, setTratamientoActivo] = useState<TratamientoId | null>(null);
   const [estadoPorPaciente, setEstadoPorPaciente] = useState<Record<string, EstadoOdontograma>>(
@@ -137,7 +137,7 @@ export function OdontogramaModule({ pacienteInicial, estadoInicial }: Odontogram
    * guardado de `paciente`, si aún no se ha cargado en esta visita a la
    * página. Se dispara al seleccionar un paciente en el buscador.
    */
-  async function cargarHistorialPaciente(paciente: PacienteDemo): Promise<void> {
+  async function cargarHistorialPaciente(paciente: PacienteOdontograma): Promise<void> {
     if (pacientesCargados.has(paciente.id)) return;
 
     setCargandoHistorial(true);
@@ -161,7 +161,7 @@ export function OdontogramaModule({ pacienteInicial, estadoInicial }: Odontogram
     }
   }
 
-  function manejarSeleccionPaciente(paciente: PacienteDemo) {
+  function manejarSeleccionPaciente(paciente: PacienteOdontograma) {
     setPacienteActivo(paciente);
     setTipoDenticion(paciente.denticionSugerida);
     setSeleccionActiva(null);
