@@ -40,9 +40,11 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   de sesión firmada con HMAC, y guard de sesión en `(dashboard)/dashboard/layout.tsx`
   (ver sección "Autenticación de médicos" abajo).
 - `src/app/(dashboard)/dashboard/odontograma/page.tsx` + `src/components/odontograma/*`
-  — Módulo de Odontograma IA e Historial Clínico: mapa dental interactivo por
-  superficie (FDI, dentición adulta/infantil), leyenda de tratamientos y bitácora de
-  hallazgos de la sesión (ver sección "Módulo de Odontograma IA" abajo).
+  + `src/utils/odontogramaRepository.ts` + `src/app/api/odontograma/*` — Módulo de
+  Odontograma IA e Historial Clínico: mapa dental interactivo por superficie (FDI,
+  dentición adulta/infantil), leyenda de tratamientos, bitácora de hallazgos de la
+  sesión, y **persistencia real en la pestaña "Odontogramas" de Google Sheets** vía
+  el botón "Guardar Evolución" (ver sección "Módulo de Odontograma IA" abajo).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -89,25 +91,72 @@ lectura a Google Sheets por petición en vez de duplicarla.
 
 ## Módulo de Odontograma IA e Historial Clínico (`/dashboard/odontograma`)
 
-Mapa dental interactivo con registro de hallazgos por superficie, pensado para el
-flujo de consulta del médico. **Alcance explícito de esta entrega: es 100% datos de
-demostración.** Todo el estado (paciente activo, dentición, diagnóstico por
-superficie, historial de evolución) vive en `useState` dentro de
-`OdontogramaModule.tsx` — no hay lectura ni escritura a Google Sheets. Al recargar la
-página, el odontograma vuelve a su estado inicial (todas las piezas "sanas"). Cuando
-se decida persistir esto de verdad, el punto de entrada es
-`aplicarTratamiento()` en `OdontogramaModule.tsx`: ahí es donde iría el `fetch` a un
-futuro endpoint (ej. `POST /api/odontograma/registrar-hallazgo`) en vez de solo
-actualizar el estado local.
+Mapa dental interactivo con registro de hallazgos por superficie, con **persistencia
+real en Google Sheets** (pestaña "Odontogramas") — ya no es un estado de demostración
+que se pierde al recargar la página.
+
+### ⚠️ Paso manual requerido en tu Google Sheet
+
+Antes de usar "Guardar Evolución" en producción, crea a mano una pestaña nueva
+llamada **exactamente** `Odontogramas` en tu spreadsheet (la misma hoja que
+`GOOGLE_SHEET_ID` ya apunta), con estos encabezados en la **Fila 1**, en este orden
+exacto:
+
+| Columna | A | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| Encabezado | `id_odontograma` | `id_paciente` | `id_medico` | `fecha` | `datos_dentales` | `notas_evolucion` |
+
+`datos_dentales` guarda el `EstadoOdontograma` completo (mapa de número de pieza FDI →
+estado de sus 5 superficies) serializado con `JSON.stringify` — es la única columna
+que no es texto legible a simple vista; las demás sí lo son. Sin esta pestaña, tanto
+"Guardar Evolución" como la carga del historial fallarán con un error controlado (ver
+`odontogramaRepository.ts`) en vez de romper la página.
+
+### Flujo de guardado y carga
+
+- **Guardar** (botón "Guardar Evolución", esquina superior derecha): recopila el
+  estado actual de las piezas del paciente activo + un resumen textual de los
+  hallazgos de la sesión (ej. *"Pieza 14: Caries en superficie Oclusal; Pieza 26:
+  Corona / Puente (toda la pieza)."*) y hace `POST /api/odontograma/guardar`. Cada
+  clic **inserta una fila nueva** (nunca sobreescribe) — así la hoja termina siendo un
+  historial completo de snapshots por paciente, no solo el estado más reciente.
+  Mientras guarda, el botón muestra un spinner (`Loader2` de `lucide-react`) y queda
+  deshabilitado; al terminar, aparece una alerta flotante (Toast) de éxito o error en
+  la esquina inferior derecha, que se cierra sola a los 4 segundos o con el botón ✕.
+- **Cargar**: al abrir `/dashboard/odontograma`, el Server Component (`page.tsx`) lee
+  directamente de `odontogramaRepository.ts` (sin pasar por HTTP) el **último**
+  registro guardado del primer paciente de la lista de demostración, decodifica
+  `datos_dentales` con `JSON.parse` + lo sanea (`sanearEstadoOdontograma`), y lo pasa
+  como `estadoInicial` a `<OdontogramaModule />` — el dentista ve su historial real
+  desde la primera pintura de la página, sin parpadeo. Si el dentista cambia de
+  paciente desde el buscador (lo que ocurre *sin* recargar la página), el propio
+  `OdontogramaModule.tsx` trae el historial de ese otro paciente con `GET
+  /api/odontograma/:idPaciente`, y lo cachea en memoria para no repetir la consulta si
+  vuelve a seleccionar al mismo paciente en la misma visita.
+- **"Último registro" = modelo de solo-anexar**: como cada guardado es un `INSERT`
+  (`agregarFila` → `values.append`), "el último odontograma de un paciente" se resuelve
+  recorriendo la hoja y quedándose con la última fila que coincide con su
+  `id_paciente`. Si algún día reordenas filas a mano en el Sheet, esa suposición deja
+  de sostenerse — no ocurre en el flujo normal de la app.
+- **Saneamiento defensivo**: cualquier valor que llegue de la hoja en `datos_dentales`
+  pasa por `sanearEstadoOdontograma()` (en `tipos.ts`) antes de tocar la UI — descarta
+  piezas con claves no numéricas, superficies faltantes o tratamientos con un id
+  desconocido, en vez de lanzar una excepción por una celda editada a mano o corrupta.
+- **`id_medico` nunca viaja desde el cliente**: `POST /api/odontograma/guardar` lo
+  resuelve siempre de la cookie de sesión firmada (`obtenerIdMedicoSesion()`), igual
+  que el resto del panel — el body solo manda `idPaciente`, `estado` y
+  `notasEvolucion`.
 
 Estructura (`src/components/odontograma/`):
 
 - `tipos.ts` — catálogos y tipos compartidos: las 5 superficies clínicas
   (`vestibular`, `lingual`/palatina, `mesial`, `distal`, `oclusal`), los 4
   tratamientos de la leyenda con su color normalizado (Caries = rojo, Tratamiento
-  Realizado = azul, Corona/Puente = verde, Ausente/Extracción = gris con tachado), y
-  el layout de numeración FDI para dentición adulta (32 piezas: cuadrantes 1-4,
-  11-48) e infantil/decidua (20 piezas: cuadrantes 5-8, 51-85).
+  Realizado = azul, Corona/Puente = verde, Ausente/Extracción = gris con tachado), el
+  layout de numeración FDI para dentición adulta (32 piezas: cuadrantes 1-4, 11-48) e
+  infantil/decidua (20 piezas: cuadrantes 5-8, 51-85), y las funciones de
+  serialización (`sanearEstadoOdontograma`, `construirNotasEvolucion`,
+  `describirHallazgo`) que comparten el cliente y el repositorio de servidor.
 - `Diente.tsx` — SVG de una pieza dental ("diagrama de sobre") con sus 5 superficies
   como formas independientes y clicables; cada una se pinta con relleno suave +
   borde del color del tratamiento aplicado. Si la pieza está "Ausente/Extracción",
@@ -121,19 +170,36 @@ Estructura (`src/components/odontograma/`):
   elegir el diagnóstico para esa superficie puntual.
 - `BuscadorPacientes.tsx` — buscador con desplegable sobre una lista fija de
   pacientes de prueba (`PACIENTES_DEMO` en `tipos.ts`); cada paciente tiene su propio
-  estado de odontograma e historial, independientes entre sí.
+  estado de odontograma e historial, independientes entre sí, y ahora también su
+  propio historial real en Google Sheets.
 - `HistorialEvolucion.tsx` — lista textual de los hallazgos registrados en la sesión
   actual del paciente activo (más reciente primero), ej. *"Pieza 14: Caries en
-  superficie Oclusal."*
+  superficie Oclusal."* Sigue siendo solo de la sesión en curso (no se relee de la
+  hoja) — lo que cambia con este paso es que, al guardar, ese resumen sí queda escrito
+  en `notas_evolucion`.
+- `ToastGuardado.tsx` — alerta flotante de éxito/error para el resultado de "Guardar
+  Evolución"; se autocierra a los 4 segundos (`AUTO_CIERRE_TOAST_MS`) o con su botón ✕.
 - `OdontogramaModule.tsx` — orquestador `'use client'` que concentra todo el estado
-  (`estadoPorPaciente`, `historialPorPaciente`) y la lógica de negocio central,
-  `aplicarTratamiento(numeroDiente, superficie, tratamiento)`. Caso especial: aplicar
-  "Ausente/Extracción" propaga el estado a las 5 superficies de la pieza a la vez
-  (una pieza extraída no tiene sentido con una cara "sana" y otra "ausente").
+  (`estadoPorPaciente`, `historialPorPaciente`, qué pacientes ya se cargaron desde la
+  hoja) y la lógica de negocio central: `aplicarTratamiento(...)` (con el caso especial
+  de "Ausente/Extracción" propagándose a las 5 superficies a la vez),
+  `cargarHistorialPaciente(...)` (fetch al cambiar de paciente) y `guardarEvolucion()`
+  (fetch al hacer clic en "Guardar Evolución").
 
-`src/app/(dashboard)/dashboard/odontograma/page.tsx` es intencionalmente un server
-component mínimo: la protección de sesión y el `<PanelShell />` ya los provee
-`dashboard/layout.tsx`, así que la página solo monta `<OdontogramaModule />`.
+`src/utils/odontogramaRepository.ts` es la única capa que sabe leer/escribir la
+pestaña "Odontogramas" (mismo patrón que `citasRepository.ts` / `medicosRepository.ts`
+para el resto de la app): expone `guardarOdontograma(...)` y
+`obtenerUltimoOdontogramaPorPaciente(idPaciente)`.
+
+`src/app/api/odontograma/guardar/route.ts` (`POST`) y
+`src/app/api/odontograma/[idPaciente]/route.ts` (`GET`) son las dos API routes nuevas,
+ambas protegidas por la misma cookie de sesión firmada que el resto de `/dashboard/*`
+(sin sesión válida, responden 401).
+
+`src/app/(dashboard)/dashboard/odontograma/page.tsx` sigue siendo un server component
+async liviano: la protección de sesión y el `<PanelShell />` ya los provee
+`dashboard/layout.tsx`; lo único que agrega esta página es la lectura inicial del
+historial del primer paciente antes de montar `<OdontogramaModule />`.
 
 ## Autenticación de médicos (`/login`)
 
@@ -374,7 +440,12 @@ delante de este flujo — el diseño actual ya deja el lugar exacto donde conect
 **Pestaña "Citas"** (columnas A–H):
 `id_cita | id_medico | nombre_paciente | telefono_paciente | correo_paciente | fecha (YYYY-MM-DD) | hora (HH:mm) | estatus`
 
-La fila 1 de ambas pestañas debe ser encabezados (el código lee a partir de la fila 2).
+**Pestaña "Odontogramas"** (columnas A–F) — **debes crearla a mano**, no viene en la
+plantilla original; ver la sección "Módulo de Odontograma IA" arriba para el detalle
+completo:
+`id_odontograma | id_paciente | id_medico | fecha (YYYY-MM-DD) | datos_dentales (JSON) | notas_evolucion`
+
+La fila 1 de las tres pestañas debe ser encabezados (el código lee a partir de la fila 2).
 
 ## Configuración de variables de entorno en Vercel
 

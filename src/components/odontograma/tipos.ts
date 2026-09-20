@@ -237,3 +237,62 @@ export interface HallazgoHistorial {
   /** Hora local (HH:mm:ss) en que se registró, solo para mostrar en el log. */
   hora: string;
 }
+
+// ---------------------------------------------------------------------------
+// Serialización / saneamiento — persistencia real en Google Sheets
+// ---------------------------------------------------------------------------
+
+/** Todo id de tratamiento válido, incluyendo "sano" (no se guarda en la leyenda pero sí es un estado posible). */
+const IDS_TRATAMIENTO_VALIDOS = new Set<TratamientoId>(['sano', ...TRATAMIENTOS.map((t) => t.id)]);
+
+function esTratamientoIdValido(valor: unknown): valor is TratamientoId {
+  return typeof valor === 'string' && IDS_TRATAMIENTO_VALIDOS.has(valor as TratamientoId);
+}
+
+function esEstadoSuperficiesValido(valor: unknown): valor is EstadoSuperficies {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const objeto = valor as Record<string, unknown>;
+  return SUPERFICIES.every((superficie) => esTratamientoIdValido(objeto[superficie]));
+}
+
+/**
+ * Sanea un valor arbitrario — típicamente el resultado de `JSON.parse` sobre
+ * la columna `datos_dentales` de la pestaña "Odontogramas" de Google Sheets —
+ * a un `EstadoOdontograma` válido.
+ *
+ * Se usa en la frontera cliente↔servidor↔hoja de cálculo: una celda editada
+ * a mano, un guardado interrumpido a la mitad, o un cambio futuro de formato
+ * no deben poder tirar la página con una excepción — cualquier pieza mal
+ * formada simplemente se descarta en vez de propagarse a la UI.
+ */
+export function sanearEstadoOdontograma(valor: unknown): EstadoOdontograma {
+  const resultado: EstadoOdontograma = {};
+  if (typeof valor !== 'object' || valor === null) return resultado;
+
+  for (const [clave, superficies] of Object.entries(valor as Record<string, unknown>)) {
+    const numero = Number(clave);
+    if (!Number.isInteger(numero)) continue;
+    if (!esEstadoSuperficiesValido(superficies)) continue;
+    resultado[numero] = superficies;
+  }
+
+  return resultado;
+}
+
+/** Describe un hallazgo individual en una sola línea de texto clínico. */
+export function describirHallazgo(hallazgo: HallazgoHistorial): string {
+  const definicion = obtenerDefinicionTratamiento(hallazgo.tratamiento);
+  const ubicacion =
+    hallazgo.tratamiento === 'ausente' ? '(toda la pieza)' : `en superficie ${ETIQUETAS_SUPERFICIE[hallazgo.superficie]}`;
+  return `Pieza ${hallazgo.numeroDiente}: ${definicion.etiqueta} ${ubicacion}`;
+}
+
+/**
+ * Compone el texto que se guarda en la columna `notas_evolucion` al hacer
+ * clic en "Guardar Evolución" — un resumen legible de todos los hallazgos
+ * registrados en la sesión actual del paciente hasta ese momento.
+ */
+export function construirNotasEvolucion(hallazgos: HallazgoHistorial[]): string {
+  if (hallazgos.length === 0) return 'Sin hallazgos nuevos registrados en esta sesión.';
+  return `${hallazgos.map(describirHallazgo).join('; ')}.`;
+}

@@ -58,6 +58,11 @@ medisys-saas/
     │       │   │   └── route.ts             # ✅ Valida credenciales + configura cookie firmada
     │       │   └── logout/
     │       │       └── route.ts             # ✅ Borra la cookie de sesión
+    │       ├── odontograma/
+    │       │   ├── guardar/
+    │       │   │   └── route.ts             # ✅ POST — inserta un snapshot en "Odontogramas"
+    │       │   └── [idPaciente]/
+    │       │       └── route.ts             # ✅ GET — último snapshot guardado de un paciente
     │       └── webhooks/
     │           └── pagos/
     │               └── route.ts             # Stub — webhook de pasarela de pago (Stripe/Conekta)
@@ -70,14 +75,15 @@ medisys-saas/
     │   ├── medicos/
     │   │   ├── TarjetaMedico.tsx
     │   │   └── PerfilMedico.tsx
-    │   └── odontograma/                     # ✅ Módulo de Odontograma IA (datos de prueba, useState)
-    │       ├── tipos.ts                     # Catálogos: superficies, tratamientos, layout FDI
+    │   └── odontograma/                     # ✅ Módulo de Odontograma IA — persistido en Google Sheets
+    │       ├── tipos.ts                     # Catálogos + saneamiento (sanearEstadoOdontograma)
     │       ├── Diente.tsx                   # SVG de una pieza con sus 5 superficies clicables
     │       ├── LeyendaTratamientos.tsx       # Panel lateral de tratamientos (Caries, Corona...)
     │       ├── PopoverSuperficie.tsx         # Popover para aplicar diagnóstico a una superficie
     │       ├── BuscadorPacientes.tsx         # Buscador sobre PACIENTES_DEMO
     │       ├── HistorialEvolucion.tsx        # Bitácora textual de hallazgos de la sesión
-    │       └── OdontogramaModule.tsx         # Orquestador 'use client' — todo el estado vive aquí
+    │       ├── ToastGuardado.tsx             # Alerta flotante de éxito/error al guardar
+    │       └── OdontogramaModule.tsx         # Orquestador 'use client' — estado + fetch guardar/cargar
     │
     ├── hooks/
     │   ├── useDisponibilidad.ts             # Consume /api/booking/disponibilidad
@@ -89,6 +95,7 @@ medisys-saas/
     └── utils/
         ├── googleSheets.ts                  # ✅ Cliente autenticado + helpers CRUD
         ├── medicosRepository.ts             # ✅ Acceso a datos de la pestaña "Medicos"
+        ├── odontogramaRepository.ts         # ✅ Acceso a datos de la pestaña "Odontogramas"
         ├── validation.ts                    # ✅ Validación estricta de inputs
         └── notifications.ts                 # ✅ WhatsApp (placeholder) + Email (Resend)
 ```

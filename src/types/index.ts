@@ -106,3 +106,27 @@ export interface CredencialMedico {
   usuario_login: string;
   password_hash: string;
 }
+
+/**
+ * Representa una fila de la pestaña "Odontogramas" (persistencia real del
+ * Módulo de Odontograma IA — ver `src/utils/odontogramaRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_odontograma`, `id_paciente`, `id_medico`, `fecha`, `datos_dentales`,
+ * `notas_evolucion`.
+ *
+ * `datos_dentales` guarda el `EstadoOdontograma` completo (ver
+ * `src/components/odontograma/tipos.ts`) serializado con `JSON.stringify` —
+ * este tipo lo modela ya como texto crudo; el parseo/saneamiento (`JSON.parse`
+ * + `sanearEstadoOdontograma`) ocurre en el repositorio, nunca en la UI.
+ */
+export interface RegistroOdontograma {
+  id_odontograma: string;
+  id_paciente: string;
+  id_medico: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha: string;
+  /** `EstadoOdontograma` serializado con `JSON.stringify`. */
+  datos_dentales: string;
+  notas_evolucion: string;
+}
