@@ -286,11 +286,11 @@ export interface InvitarUsuarioInput {
 
 /**
  * Preferencias de recordatorios automáticos de citas — se guarda como una
- * sola columna JSON (`configuracion_recordatorios_json`, columna N opcional
- * de "Medicos") en vez de una columna booleana por interruptor, siguiendo el
- * mismo criterio ya usado para `horario_config`: agregar un nuevo
- * recordatorio en el futuro (ej. "1 semana antes") no requiere una migración
- * de columnas.
+ * sola columna JSON (`configuracion_recordatorios_json`, columna **P**
+ * opcional de "Medicos" — nunca N/O, reservadas para las credenciales de
+ * login) en vez de una columna booleana por interruptor, siguiendo el mismo
+ * criterio ya usado para `horario_config`: agregar un nuevo recordatorio en
+ * el futuro (ej. "1 semana antes") no requiere una migración de columnas.
  */
 export interface ConfiguracionRecordatorios {
   recordatorio24hActivo: boolean;
@@ -301,3 +301,128 @@ export interface ConfiguracionRecordatorios {
 
 /** Payload que la mesa de control envía a `POST /api/recordatorios/actualizar`. */
 export type ActualizarRecordatoriosInput = ConfiguracionRecordatorios;
+
+/**
+ * Representa una fila de la pestaña "Historiales_Clinicos" — vista
+ * "Historial Clínico" (ver `src/utils/historialClinicoRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_historial`, `id_paciente`, `id_medico`, `fecha`, `motivo_consulta`,
+ * `diagnostico`, `tratamiento_sugerido`, `notas_privadas`.
+ *
+ * Es append-only, como "Pacientes"/"Saldos" — cada nota de evolución es una
+ * fila nueva; nunca se edita una fila existente.
+ */
+export interface RegistroHistorialClinico {
+  /** Formato "HIST-12345" (ver `generarIdHistorialUnico` en `historialClinicoRepository.ts`). */
+  id_historial: string;
+  id_paciente: string;
+  id_medico: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha: string;
+  motivo_consulta: string;
+  diagnostico: string;
+  tratamiento_sugerido: string;
+  /** Notas internas del médico — nunca se muestran en el portal público ni al paciente. */
+  notas_privadas: string;
+}
+
+/** Payload que el formulario "Agregar Nota de Evolución" envía a `POST /api/historial/crear`. */
+export interface CrearRegistroHistorialInput {
+  idPaciente: string;
+  motivoConsulta: string;
+  diagnostico: string;
+  tratamientoSugerido: string;
+  notasPrivadas: string;
+}
+
+/** Una fila de la tabla de tratamientos dentro de un presupuesto (columna `items_json` serializada). */
+export interface ItemPresupuesto {
+  tratamiento: string;
+  /** Pieza dental afectada (notación FDI, ej. "16") — puede venir vacío si el tratamiento no aplica a un diente específico. */
+  diente: string;
+  costoUnitario: number;
+  cantidad: number;
+}
+
+/** Un presupuesto en 'Borrador' todavía se puede editar/descartar; 'Aceptado' ya generó su cargo en "Saldos" y es definitivo. */
+export type EstatusPresupuesto = 'Borrador' | 'Aceptado';
+
+/**
+ * Representa una fila de la pestaña "Presupuestos_Detallados" — vista
+ * "Cotizador de Presupuestos" (ver `src/utils/presupuestosRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_presupuesto`, `id_paciente`, `id_medico`, `fecha`, `items_json`,
+ * `descuento`, `total_mxn`, `estatus`.
+ *
+ * `total_mxn` SIEMPRE se calcula del lado del servidor a partir de `items` y
+ * `descuento` (`calcularTotalPresupuesto` en `components/cotizador/tipos.ts`)
+ * — nunca se confía en un total que mandara el cliente.
+ */
+export interface PresupuestoDetallado {
+  /** Formato "PRE-12345" (ver `generarIdPresupuestoUnico` en `presupuestosRepository.ts`). */
+  id_presupuesto: string;
+  id_paciente: string;
+  id_medico: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha: string;
+  items: ItemPresupuesto[];
+  /** Descuento en MXN (monto fijo, no porcentaje) aplicado sobre el subtotal. */
+  descuento: number;
+  total_mxn: number;
+  estatus: EstatusPresupuesto;
+}
+
+/** Payload que el constructor de presupuestos envía a `POST /api/presupuestos/crear`. Siempre se crea como 'Borrador'. */
+export interface CrearPresupuestoInput {
+  idPaciente: string;
+  items: ItemPresupuesto[];
+  descuento: number;
+}
+
+/** Payload que el botón "Pasar a Estado de Cuenta" envía a `POST /api/presupuestos/pasar-a-cuenta`. */
+export interface PasarPresupuestoACuentaInput {
+  idPresupuesto: string;
+}
+
+/** Tipo de archivo clínico — determina el ícono/badge en la Galería. */
+export type TipoArchivoGaleria = 'Radiografia' | 'Fotografia';
+
+/**
+ * Representa una fila de la pestaña "Galeria_Clinica" — vista "Galería
+ * Clínica" (ver `src/utils/galeriaRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_foto`, `id_paciente`, `fecha`, `descripcion`, `imagen_url`,
+ * `tipo_archivo`.
+ *
+ * A propósito NO tiene columna `id_medico` (así se pidió) — el acceso queda
+ * acotado porque solo se llega aquí a través de un `id_paciente` que ya
+ * resolvió `obtenerPacientePorId`, cuya lectura sí está scoped por médico en
+ * el resto de la app.
+ */
+export interface FotoGaleria {
+  /** Formato "IMG-12345" (ver `generarIdFotoUnico` en `galeriaRepository.ts`). */
+  id_foto: string;
+  id_paciente: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha: string;
+  descripcion: string;
+  /**
+   * URL de la imagen. Como todavía no existe infraestructura real de carga
+   * de archivos, `POST /api/galeria/subir` genera una URL de PLACEHOLDER
+   * determinística (`https://picsum.photos/seed/<id_foto>/...`) en vez de
+   * subir un archivo real — tal como se pidió ("simule la carga... capture
+   * una URL de prueba").
+   */
+  imagen_url: string;
+  tipo_archivo: TipoArchivoGaleria;
+}
+
+/** Payload que el modal "Subir Imagen" envía a `POST /api/galeria/subir`. */
+export interface SubirFotoGaleriaInput {
+  idPaciente: string;
+  descripcion: string;
+  tipoArchivo: TipoArchivoGaleria;
+}
