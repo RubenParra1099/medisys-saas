@@ -42,7 +42,9 @@ medisys-saas/
     │   │       │   ├── page.tsx             # ✅ Listado real (KPIs + <TablaPacientes />)
     │   │       │   └── nuevo/
     │   │       │       └── page.tsx         # ✅ Captura de Pacientes Nuevos (monta <FormularioNuevoPaciente />)
-    │   │       ├── documentos/, whatsapp/, recordatorios/,
+    │   │       ├── documentos/
+    │   │       │   └── page.tsx             # ✅ Cotizador de Presupuestos y Control de Abonos (KPIs + <TablaMovimientos />)
+    │   │       ├── whatsapp/, recordatorios/,
     │   │       │   consultorio/, correos/, cotizador/,
     │   │       │   historial/, galeria/
     │   │       │       └── page.tsx         # Stubs — secciones del Sidebar aún sin lógica
@@ -70,6 +72,9 @@ medisys-saas/
     │       ├── pacientes/
     │       │   └── crear/
     │       │       └── route.ts             # ✅ POST — inserta una fila en "Pacientes"
+    │       ├── saldos/
+    │       │   └── crear/
+    │       │       └── route.ts             # ✅ POST — inserta una fila en "Saldos" (cotización o abono)
     │       └── webhooks/
     │           └── pagos/
     │               └── route.ts             # Stub — webhook de pasarela de pago (Stripe/Conekta)
@@ -91,12 +96,18 @@ medisys-saas/
     │   │   ├── HistorialEvolucion.tsx        # Bitácora textual de hallazgos de la sesión
     │   │   ├── ToastGuardado.tsx             # Alerta flotante de éxito/error al guardar
     │   │   └── OdontogramaModule.tsx         # Orquestador 'use client' — estado + fetch guardar/cargar
-    │   └── pacientes/                        # ✅ Captura + Listado de Pacientes
-    │       ├── CampoFormulario.tsx           # Campo reutilizable (label + ícono + input/textarea + error)
-    │       ├── FormularioNuevoPaciente.tsx   # Orquestador 'use client' — estado + fetch + redirect
-    │       ├── hallazgosClinicos.ts          # separarHallazgos() + clasificarHallazgo() (badges de la tabla)
-    │       ├── KpisPacientes.tsx             # 3 tarjetas ejecutivas (server component, sin 'use client')
-    │       └── TablaPacientes.tsx            # Orquestador 'use client' — buscador + tabla clínica
+    │   ├── pacientes/                        # ✅ Captura + Listado de Pacientes
+    │   │   ├── CampoFormulario.tsx           # Campo reutilizable (label + ícono + input/textarea + error)
+    │   │   ├── FormularioNuevoPaciente.tsx   # Orquestador 'use client' — estado + fetch + redirect
+    │   │   ├── hallazgosClinicos.ts          # separarHallazgos() + clasificarHallazgo() (badges de la tabla)
+    │   │   ├── KpisPacientes.tsx             # 3 tarjetas ejecutivas (server component, sin 'use client')
+    │   │   └── TablaPacientes.tsx            # Orquestador 'use client' — buscador + tabla clínica + acciones (Odontograma/Cotizador)
+    │   └── documentos/                       # ✅ Cotizador de Presupuestos y Control de Abonos
+    │       ├── tipos.ts                      # calcularResumenFinanciero() + ESTILOS_TIPO_MOVIMIENTO + formatearMoneda()
+    │       ├── KpisFinancieros.tsx           # 3 tarjetas ejecutivas (server component, sin 'use client')
+    │       ├── TablaMovimientos.tsx          # Orquestador 'use client' — tabla + botón que abre <ModalMovimiento />
+    │       ├── ModalMovimiento.tsx           # Modal a dos columnas — captura y POST de un nuevo movimiento
+    │       └── BuscadorPacienteFinanciero.tsx # Orquestador 'use client' — buscador/selector de paciente real
     │
     ├── hooks/
     │   ├── useDisponibilidad.ts             # Consume /api/booking/disponibilidad
@@ -110,6 +121,7 @@ medisys-saas/
         ├── medicosRepository.ts             # ✅ Acceso a datos de la pestaña "Medicos"
         ├── odontogramaRepository.ts         # ✅ Acceso a datos de la pestaña "Odontogramas"
         ├── pacientesRepository.ts           # ✅ Acceso a datos de la pestaña "Pacientes"
+        ├── saldosRepository.ts              # ✅ Acceso a datos de la pestaña "Saldos" (Cotizador)
         ├── edad.ts                          # ✅ calcularEdad() + sugerirDenticionPorEdad()
         ├── validation.ts                    # ✅ Validación estricta de inputs
         └── notifications.ts                 # ✅ WhatsApp (placeholder) + Email (Resend)

@@ -56,6 +56,13 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   ejecutivos, buscador en tiempo real, y tabla clínica con badges de color dinámico
   por alergia/condición y acceso directo al odontograma de cada paciente (ver sección
   "Listado de Pacientes" abajo).
+- `src/app/(dashboard)/dashboard/documentos/page.tsx` + `src/components/documentos/*`
+  + `src/utils/saldosRepository.ts` + `src/app/api/saldos/crear/route.ts` — Cotizador
+  de Presupuestos y Control de Abonos: 3 KPIs financieros (Total Presupuestado / Total
+  Abonado / Saldo Pendiente), buscador de paciente real, tabla de movimientos con
+  badges por tipo, y modal "Crear Cotización / Registrar Abono" que inserta en la
+  pestaña "Saldos" de Google Sheets (ver sección "Cotizador de Presupuestos y Control
+  de Abonos" abajo — reemplaza el marcador gris que antes vivía en esta misma ruta).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -358,6 +365,96 @@ para traer el listado (con `.catch()` que degrada a lista vacía si Sheets falla
 vez de tronar la página), cálculo de los 3 KPIs, y renderiza `<KpisPacientes />` +
 `<TablaPacientes />`.
 
+## Cotizador de Presupuestos y Control de Abonos (`/dashboard/documentos`)
+
+> **Nota de precisión:** el enunciado de este módulo pedía reemplazar el marcador
+> provisional en `src/app/(dashboard)/dashboard/pacientes/[id]/saldos/page.tsx` — esa
+> ruta no existe en el proyecto. El ítem real del `Sidebar` llamado "Documentos &
+> Saldos" apunta a `/dashboard/documentos` (`{ etiqueta: 'Documentos & Saldos', href:
+> '/dashboard/documentos', icono: Wallet }`), que era el stub gris genérico ("Pendiente
+> de implementar") — es esa ruta la que se reemplazó por el Cotizador completo, para
+> que quede conectada al `Sidebar` real y navegable de inmediato.
+
+Reemplaza el stub gris de "Documentos & Saldos" por el módulo financiero completo del
+expediente del paciente: presupuestos de tratamiento, abonos, y saldo pendiente,
+recalculados en cada carga a partir del historial real en Google Sheets.
+
+### ⚠️ Paso manual requerido en tu Google Sheet
+
+Crea una pestaña llamada exactamente **`Saldos`** con estos encabezados en la Fila 1,
+en este orden exacto:
+
+| id_transaccion | id_paciente | id_medico | fecha | concepto | tipo | monto | notas |
+|---|---|---|---|---|---|---|---|
+
+- `id_transaccion`: se autogenera con formato `TX-12345` (mismo esquema colisión-
+  verificada que `id_paciente` en la pestaña "Pacientes").
+- `tipo`: siempre uno de dos valores literales — `"Presupuesto"` o `"Abono"`.
+- `monto`: siempre un número positivo — el signo con el que afecta el saldo (suma al
+  presupuestado o resta como abonado) lo decide `tipo`, nunca el número en sí.
+
+### Selector de paciente (`BuscadorPacienteFinanciero.tsx`, `'use client'`)
+
+A diferencia del buscador del odontograma (que todavía navega sobre
+`PACIENTES_DEMO`), este selector siempre lista pacientes **reales** —
+`listarPacientesPorMedico(idMedico)` — porque no tiene sentido mostrar saldos de
+pacientes de demostración. Filtra en tiempo real por nombre o `id_paciente`, y al
+elegir uno navega a `/dashboard/documentos?id=<id_paciente>` (mismo query param
+canónico `?id=` que usan el odontograma y la tabla de pacientes).
+
+### KPIs (`KpisFinancieros.tsx`, calculados por `calcularResumenFinanciero`)
+
+- **Total Presupuestado**: suma de todos los movimientos con `tipo = "Presupuesto"`.
+- **Total Abonado**: suma de todos los movimientos con `tipo = "Abono"`.
+- **Saldo Pendiente**: `Total Presupuestado − Total Abonado`. La tarjeta cambia de
+  color dinámicamente — rojo si el paciente aún debe (`> 0`), esmeralda si está
+  saldado o pagó de más (`<= 0`).
+
+Los 3 KPIs se recalculan desde cero en cada carga de pantalla (`export const dynamic
+= 'force-dynamic'`), a partir del historial **completo** de movimientos del paciente
+— nunca se guarda un saldo acumulado en la hoja, para que jamás se desincronice del
+historial real.
+
+### Tabla de movimientos + modal (`TablaMovimientos.tsx` / `ModalMovimiento.tsx`)
+
+La tabla muestra Fecha, Concepto, Tipo (badge verde = Abono, azul = Presupuesto),
+Monto (formateado en MXN) y Notas. El botón "Crear Cotización / Registrar Abono" abre
+un modal a dos columnas: primero se elige el tipo de movimiento con dos botones
+grandes (Cargo por Tratamiento / Abono en Efectivo-Tarjeta), luego se captura
+Concepto y Monto lado a lado, y por último Notas (opcional, ancho completo).
+`idPaciente` viene fijo del contexto de la página y nunca es editable en el modal.
+
+Al guardar con éxito, el modal cierra y dispara `router.refresh()` — esto vuelve a
+ejecutar el Server Component de `page.tsx`, que relee Google Sheets y recalcula los 3
+KPIs y el historial completo con los datos más recientes, en vez de que el cliente
+intente llevar su propia copia del saldo.
+
+### API: `POST /api/saldos/crear`
+
+Body esperado:
+
+```json
+{
+  "idPaciente": "PAC-12345",
+  "concepto": "Endodoncia",
+  "tipo": "Presupuesto",
+  "monto": 1700,
+  "notas": "Pieza 14, requiere 2 sesiones"
+}
+```
+
+Igual que `/api/pacientes/crear` y `/api/odontograma/guardar`: protegido por sesión
+(401 sin cookie firmada válida), `id_medico` se resuelve **siempre** del servidor
+(`obtenerIdMedicoSesion()`), nunca del body. Valida que `concepto` tenga al menos 2
+caracteres, `tipo` sea exactamente `"Presupuesto"` o `"Abono"`, y `monto` sea un
+número finito mayor a 0.
+
+### Acceso directo desde el listado de pacientes
+
+`TablaPacientes.tsx` ahora tiene dos botones de acción por fila: "Ver Odontograma"
+(existente) y el nuevo "Cotizador" (ícono `Wallet`), que navega a
+`/dashboard/documentos?id=<id_paciente>`.
+
 ## Autenticación de médicos (`/login`)
 
 Sistema de login con usuario/contraseña que reemplaza por completo al placeholder
@@ -607,7 +704,12 @@ plantilla original; ver la sección "Captura de Pacientes Nuevos" arriba para el
 detalle completo:
 `id_paciente (PAC-12345) | id_medico | nombre_completo | telefono | correo | fecha_nacimiento (YYYY-MM-DD) | antecedentes_medicos | fecha_registro (YYYY-MM-DD)`
 
-La fila 1 de las cuatro pestañas debe ser encabezados (el código lee a partir de la fila 2).
+**Pestaña "Saldos"** (columnas A–H) — **debes crearla a mano**, no viene en la
+plantilla original; ver la sección "Cotizador de Presupuestos y Control de Abonos"
+arriba para el detalle completo:
+`id_transaccion (TX-12345) | id_paciente | id_medico | fecha (YYYY-MM-DD) | concepto | tipo ("Presupuesto" | "Abono") | monto | notas`
+
+La fila 1 de las cinco pestañas debe ser encabezados (el código lee a partir de la fila 2).
 
 ## Configuración de variables de entorno en Vercel
 

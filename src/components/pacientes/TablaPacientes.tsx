@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Mail, MessageCircle, Phone, Search, Sparkles, UserPlus, UserRound } from 'lucide-react';
+import { CheckCircle2, Mail, MessageCircle, Phone, Search, Sparkles, UserPlus, UserRound, Wallet } from 'lucide-react';
 import { ESTILOS_SEVERIDAD, clasificarHallazgo, separarHallazgos } from '@/components/pacientes/hallazgosClinicos';
 import type { Paciente } from '@/types';
 
@@ -163,13 +163,23 @@ export function TablaPacientes({ pacientesIniciales }: TablaPacientesProps) {
                       </td>
 
                       <td className="px-4 py-3.5 align-top">
-                        <Link
-                          href={`/dashboard/odontograma?id=${encodeURIComponent(paciente.id_paciente)}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10"
-                        >
-                          <Sparkles className="h-3.5 w-3.5" />
-                          Ver Odontograma
-                        </Link>
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href={`/dashboard/odontograma?id=${encodeURIComponent(paciente.id_paciente)}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/10"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Ver Odontograma
+                          </Link>
+
+                          <Link
+                            href={`/dashboard/documentos?id=${encodeURIComponent(paciente.id_paciente)}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-100"
+                          >
+                            <Wallet className="h-3.5 w-3.5" />
+                            Cotizador
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

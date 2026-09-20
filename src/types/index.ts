@@ -164,3 +164,42 @@ export interface CrearPacienteInput {
   fechaNacimiento: string;
   antecedentesMedicos: string;
 }
+
+/**
+ * Un movimiento financiero solo puede ser uno de estos dos tipos: un cargo
+ * por tratamiento presupuestado, o un abono (pago) recibido del paciente.
+ */
+export type TipoMovimientoFinanciero = 'Presupuesto' | 'Abono';
+
+/**
+ * Representa una fila de la pestaña "Saldos" (Cotizador de Presupuestos y
+ * Control de Abonos — ver `src/utils/saldosRepository.ts`).
+ *
+ * Encabezados esperados en la Fila 1 de esa pestaña, en este orden exacto:
+ * `id_transaccion`, `id_paciente`, `id_medico`, `fecha`, `concepto`, `tipo`,
+ * `monto`, `notas`.
+ */
+export interface MovimientoFinanciero {
+  /** Formato "TX-12345" (ver `generarIdTransaccionUnico` en `saldosRepository.ts`). */
+  id_transaccion: string;
+  id_paciente: string;
+  id_medico: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha: string;
+  /** Ej. "Endodoncia", "Resina", "Abono en efectivo". */
+  concepto: string;
+  tipo: TipoMovimientoFinanciero;
+  /** Siempre positivo — el signo con el que se resta o suma al saldo lo decide `tipo`, no el número. */
+  monto: number;
+  /** Puede venir vacío. */
+  notas: string;
+}
+
+/** Payload que el modal de captura envía a `POST /api/saldos/crear`. */
+export interface CrearMovimientoFinancieroInput {
+  idPaciente: string;
+  concepto: string;
+  tipo: TipoMovimientoFinanciero;
+  monto: number;
+  notas: string;
+}
