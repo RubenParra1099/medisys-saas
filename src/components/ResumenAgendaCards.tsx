@@ -7,12 +7,15 @@ interface ResumenAgendaCardsProps {
   ingresosEstimadosMes: number;
 }
 
+/** Ej: `formatearMoneda(1700)` → "$1,700.00 MXN" (Intl no añade el sufijo de moneda por sí solo). */
 function formatearMoneda(valor: number): string {
-  return new Intl.NumberFormat('es-MX', {
+  const formateado = new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(valor);
+  return `${formateado} MXN`;
 }
 
 interface Tarjeta {
@@ -27,21 +30,21 @@ interface Tarjeta {
 export function ResumenAgendaCards({ totalCitasMes, citasPendientes, ingresosEstimadosMes }: ResumenAgendaCardsProps) {
   const tarjetas: Tarjeta[] = [
     {
-      etiqueta: 'Total de Citas del Mes',
+      etiqueta: 'Citas del Mes',
       valor: totalCitasMes.toString(),
       icono: CalendarClock,
       acento: 'text-primary',
       fondo: 'bg-primary/10',
     },
     {
-      etiqueta: 'Citas Pendientes por Confirmar',
+      etiqueta: 'Por Confirmar',
       valor: citasPendientes.toString(),
       icono: Hourglass,
       acento: 'text-amber-500',
       fondo: 'bg-amber-50',
     },
     {
-      etiqueta: 'Ingresos Estimados del Mes',
+      etiqueta: 'Ingresos Estimados',
       valor: formatearMoneda(ingresosEstimadosMes),
       icono: Banknote,
       acento: 'text-emerald-600',
@@ -54,7 +57,7 @@ export function ResumenAgendaCards({ totalCitasMes, citasPendientes, ingresosEst
       {tarjetas.map((tarjeta) => {
         const Icono = tarjeta.icono;
         return (
-          <div key={tarjeta.etiqueta} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+          <div key={tarjeta.etiqueta} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tarjeta.fondo}`}>
               <Icono className={`h-5 w-5 ${tarjeta.acento}`} />
             </div>
