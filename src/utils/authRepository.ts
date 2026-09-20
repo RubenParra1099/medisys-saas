@@ -15,8 +15,10 @@ import type { CredencialMedico } from '@/types';
  * ⚠️ ADVERTENCIA DE SEGURIDAD ACTIVA: si tu hoja tiene usuario_login/password_hash
  * en K/L (en vez de N/O), esos MISMOS valores se están mostrando en este
  * momento en la página pública `/medicos/[id]` como "Cédula profesional" y
- * "Dirección" (ver DoctorProfileCard.tsx, líneas ~62 y ~70). Revisa esa
- * página y, si corresponde, mueve esos valores a N/O y borra K/L cuanto antes.
+ * "Dirección" (ver DoctorProfileCard.tsx, líneas ~62 y ~70). Es decir: el
+ * correo y la contraseña (o su hash) del médico podrían estar visibles para
+ * cualquier visitante del portal de reservas. Revisa esa página ahora mismo
+ * y, si corresponde, mueve esos valores a N/O y borra K/L cuanto antes.
  *
  * Este archivo, para no dejarte bloqueado mientras migras, soporta AMBAS
  * ubicaciones: intenta primero N/O (el diseño seguro) y, si no encuentra
@@ -24,8 +26,12 @@ import type { CredencialMedico } from '@/types';
  * `console.warn` cada vez que eso ocurre.
  *
  * Es DELIBERADAMENTE independiente de `medicosRepository.ts`: lee su propio
- * rango (`Medicos!A2:O`) y expone únicamente lo mínimo que necesita el login.
- * El tipo `CredencialMedico` vive en `src/types/index.ts` (importado arriba).
+ * rango (`Medicos!A2:O`) y expone únicamente lo mínimo que necesita el login
+ * (`id_medico`, `usuario_login`, `password_hash`). Así, el hash de la
+ * contraseña nunca pasa por el tipo `Medico` compartido con el resto de la
+ * UI (dashboard, portal público). El tipo `CredencialMedico` vive en
+ * `src/types/index.ts` (importado arriba) junto con el resto de los tipos
+ * del dominio.
  */
 
 const RANGO_CREDENCIALES = 'Medicos!A2:O';
@@ -38,9 +44,15 @@ const INDICE_PASSWORD_HASH = 14; // columna O (diseño actual, seguro)
 
 /**
  * Busca las credenciales por `usuario_login` (comparación insensible a
- * mayúsculas/espacios). Devuelve `null` si no existe el usuario o si la fila
- * está mal configurada — nunca lanza por un usuario inexistente, solo por un
- * fallo real de conexión con Google Sheets (ver `leerRango`).
+ * mayúsculas/espacios, ya que suele ser un correo). Devuelve `null` si no
+ * existe el usuario o si la fila está mal configurada — nunca lanza por un
+ * usuario inexistente, solo por un fallo real de conexión con Google Sheets
+ * (ver `leerRango`).
+ *
+ * Diagnóstico: registra qué fila coincidió (o que ninguna lo hizo) y en qué
+ * par de columnas — NUNCA registra el valor de `password_hash` en texto
+ * plano, solo si está presente y su longitud, para poder depurar sin dejar
+ * contraseñas/hashes escritos en los logs de Vercel.
  */
 export async function buscarCredencialesPorUsuario(usuario: string): Promise<CredencialMedico | null> {
   const usuarioNormalizado = usuario.trim().toLowerCase();
@@ -52,7 +64,7 @@ export async function buscarCredencialesPorUsuario(usuario: string): Promise<Cre
   );
 
   for (const [indice, fila] of filas.entries()) {
-    const numeroFilaSheet = indice + 2;
+    const numeroFilaSheet = indice + 2; // la lectura empieza en la fila 2 de la hoja
     const idMedico = (fila[INDICE_ID_MEDICO] ?? '').trim();
 
     const usuarioColN = (fila[INDICE_USUARIO_LOGIN] ?? '').trim();
@@ -75,7 +87,9 @@ export async function buscarCredencialesPorUsuario(usuario: string): Promise<Cre
       console.warn(
         `[authRepository] Coincidencia en columnas K/L (legado) para id_medico="${idMedico}". ` +
           'ADVERTENCIA: K/L también son "cedula_profesional"/"direccion" en el perfil público del médico — ' +
-          `ese correo/contraseña podría estar visible en /medicos/${idMedico} ahora mismo. Muévelos a N/O y borra K/L.`,
+          'ese correo/contraseña podría estar visible en /medicos/' +
+          idMedico +
+          ' ahora mismo. Muévelos a N/O y borra K/L.',
       );
       return { id_medico: idMedico, usuario_login: usuarioColK, password_hash: passwordColL };
     }

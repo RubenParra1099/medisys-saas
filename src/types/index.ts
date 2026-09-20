@@ -90,3 +90,19 @@ export interface ApiRespuesta<T> {
   detalles?: string[];
   data?: T;
 }
+
+/**
+ * Credenciales de login de un médico, leídas por `authRepository.ts` desde
+ * las columnas N/O (o K/L como compatibilidad temporal) de "Medicos".
+ *
+ * Vive como tipo independiente de `Medico` a propósito: `password_hash`
+ * nunca debe viajar junto con el resto de los datos del médico que sí se
+ * pasan a componentes de UI (dashboard, portal público) — mezclarlo en el
+ * tipo `Medico` sería fácil de filtrar por accidente a un componente de
+ * cliente. `authRepository.ts` es el único archivo que produce este tipo.
+ */
+export interface CredencialMedico {
+  id_medico: string;
+  usuario_login: string;
+  password_hash: string;
+}
