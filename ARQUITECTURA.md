@@ -36,8 +36,10 @@ medisys-saas/
     │   │       ├── page.tsx                 # ✅ Agenda Médica: KPIs + <CitasTable /> (raíz de /dashboard)
     │   │       ├── suscripcion/
     │   │       │   └── page.tsx             # Estado de plan_suscripcion y estatus_pago
+    │   │       ├── odontograma/
+    │   │       │   └── page.tsx             # ✅ Odontograma IA (monta <OdontogramaModule />)
     │   │       ├── pacientes/, documentos/, whatsapp/, recordatorios/,
-    │   │       │   consultorio/, correos/, odontograma/, cotizador/,
+    │   │       │   consultorio/, correos/, cotizador/,
     │   │       │   historial/, galeria/
     │   │       │       └── page.tsx         # Stubs — secciones del Sidebar aún sin lógica
     │   │
@@ -65,9 +67,17 @@ medisys-saas/
     │   ├── booking/
     │   │   ├── CalendarioDisponibilidad.tsx
     │   │   └── FormularioReserva.tsx
-    │   └── medicos/
-    │       ├── TarjetaMedico.tsx
-    │       └── PerfilMedico.tsx
+    │   ├── medicos/
+    │   │   ├── TarjetaMedico.tsx
+    │   │   └── PerfilMedico.tsx
+    │   └── odontograma/                     # ✅ Módulo de Odontograma IA (datos de prueba, useState)
+    │       ├── tipos.ts                     # Catálogos: superficies, tratamientos, layout FDI
+    │       ├── Diente.tsx                   # SVG de una pieza con sus 5 superficies clicables
+    │       ├── LeyendaTratamientos.tsx       # Panel lateral de tratamientos (Caries, Corona...)
+    │       ├── PopoverSuperficie.tsx         # Popover para aplicar diagnóstico a una superficie
+    │       ├── BuscadorPacientes.tsx         # Buscador sobre PACIENTES_DEMO
+    │       ├── HistorialEvolucion.tsx        # Bitácora textual de hallazgos de la sesión
+    │       └── OdontogramaModule.tsx         # Orquestador 'use client' — todo el estado vive aquí
     │
     ├── hooks/
     │   ├── useDisponibilidad.ts             # Consume /api/booking/disponibilidad

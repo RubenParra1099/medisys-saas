@@ -39,6 +39,10 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   + `logout/route.ts` — login real con contraseña (reemplaza a `DEMO_ID_MEDICO`), cookie
   de sesión firmada con HMAC, y guard de sesión en `(dashboard)/dashboard/layout.tsx`
   (ver sección "Autenticación de médicos" abajo).
+- `src/app/(dashboard)/dashboard/odontograma/page.tsx` + `src/components/odontograma/*`
+  — Módulo de Odontograma IA e Historial Clínico: mapa dental interactivo por
+  superficie (FDI, dentición adulta/infantil), leyenda de tratamientos y bitácora de
+  hallazgos de la sesión (ver sección "Módulo de Odontograma IA" abajo).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -82,6 +86,54 @@ placeholder `DEMO_ID_MEDICO` ya no existe — sin sesión válida, el layout red
 **Nota de rendimiento**: `listarCitasPorMedico` está envuelta en `cache()` de React,
 por lo que el layout (contador del Sidebar) y la página de Agenda comparten una sola
 lectura a Google Sheets por petición en vez de duplicarla.
+
+## Módulo de Odontograma IA e Historial Clínico (`/dashboard/odontograma`)
+
+Mapa dental interactivo con registro de hallazgos por superficie, pensado para el
+flujo de consulta del médico. **Alcance explícito de esta entrega: es 100% datos de
+demostración.** Todo el estado (paciente activo, dentición, diagnóstico por
+superficie, historial de evolución) vive en `useState` dentro de
+`OdontogramaModule.tsx` — no hay lectura ni escritura a Google Sheets. Al recargar la
+página, el odontograma vuelve a su estado inicial (todas las piezas "sanas"). Cuando
+se decida persistir esto de verdad, el punto de entrada es
+`aplicarTratamiento()` en `OdontogramaModule.tsx`: ahí es donde iría el `fetch` a un
+futuro endpoint (ej. `POST /api/odontograma/registrar-hallazgo`) en vez de solo
+actualizar el estado local.
+
+Estructura (`src/components/odontograma/`):
+
+- `tipos.ts` — catálogos y tipos compartidos: las 5 superficies clínicas
+  (`vestibular`, `lingual`/palatina, `mesial`, `distal`, `oclusal`), los 4
+  tratamientos de la leyenda con su color normalizado (Caries = rojo, Tratamiento
+  Realizado = azul, Corona/Puente = verde, Ausente/Extracción = gris con tachado), y
+  el layout de numeración FDI para dentición adulta (32 piezas: cuadrantes 1-4,
+  11-48) e infantil/decidua (20 piezas: cuadrantes 5-8, 51-85).
+- `Diente.tsx` — SVG de una pieza dental ("diagrama de sobre") con sus 5 superficies
+  como formas independientes y clicables; cada una se pinta con relleno suave +
+  borde del color del tratamiento aplicado. Si la pieza está "Ausente/Extracción",
+  además dibuja una X diagonal completa sobre toda la pieza.
+- `LeyendaTratamientos.tsx` — panel lateral derecho con los 4 tratamientos; al hacer
+  clic en uno, queda "activo" y el siguiente clic sobre cualquier superficie del
+  odontograma lo aplica de inmediato (atajo para capturar varios hallazgos iguales
+  seguidos, sin abrir el popover cada vez).
+- `PopoverSuperficie.tsx` — panel emergente centrado (overlay + backdrop) que se
+  abre al hacer clic en una superficie sin tratamiento activo en la leyenda; permite
+  elegir el diagnóstico para esa superficie puntual.
+- `BuscadorPacientes.tsx` — buscador con desplegable sobre una lista fija de
+  pacientes de prueba (`PACIENTES_DEMO` en `tipos.ts`); cada paciente tiene su propio
+  estado de odontograma e historial, independientes entre sí.
+- `HistorialEvolucion.tsx` — lista textual de los hallazgos registrados en la sesión
+  actual del paciente activo (más reciente primero), ej. *"Pieza 14: Caries en
+  superficie Oclusal."*
+- `OdontogramaModule.tsx` — orquestador `'use client'` que concentra todo el estado
+  (`estadoPorPaciente`, `historialPorPaciente`) y la lógica de negocio central,
+  `aplicarTratamiento(numeroDiente, superficie, tratamiento)`. Caso especial: aplicar
+  "Ausente/Extracción" propaga el estado a las 5 superficies de la pieza a la vez
+  (una pieza extraída no tiene sentido con una cara "sana" y otra "ausente").
+
+`src/app/(dashboard)/dashboard/odontograma/page.tsx` es intencionalmente un server
+component mínimo: la protección de sesión y el `<PanelShell />` ya los provee
+`dashboard/layout.tsx`, así que la página solo monta `<OdontogramaModule />`.
 
 ## Autenticación de médicos (`/login`)
 
@@ -209,6 +261,38 @@ configurar, etc.). Para comprobar eso sin acceso a los logs:
 4. **Importante**: borra `DEBUG_SECRET` de Vercel (o la ruta del repositorio)
    en cuanto termines de depurar — si la variable no existe, el endpoint se
    autodesactiva y responde `404`.
+
+### 2.1 Endpoint protegido — diagnosticar el LOGIN específicamente (401 al iniciar sesión)
+
+Mismo gate que el anterior (`DEBUG_SECRET`), pero corre la búsqueda de
+credenciales real (`buscarCredencialesPorUsuario` + `verificarPassword`, las
+mismas funciones que usa `POST /api/auth/login`) y te dice exactamente en
+qué paso falla — sin nunca exponer la contraseña ni el hash:
+
+```bash
+curl -X POST "https://tu-proyecto.vercel.app/api/debug/probar-login?secret=TU_DEBUG_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"usuario":"ruben@medisys.com","password":"admin123"}'
+```
+
+Te dirá si `SESSION_SECRET` está configurada, si encontró la fila en
+"Medicos" (y si el valor guardado es un hash bcrypt o texto plano), y si la
+contraseña coincide. Bórralo (o borra `DEBUG_SECRET`) cuando termines.
+
+**Atajo sin deploy para entrar mientras depuras**: si ya tienes el valor real
+de `SESSION_SECRET` (Vercel → Environment Variables), puedes fabricar tú
+mismo una cookie de sesión válida sin tocar el código:
+
+```bash
+node -e "
+const crypto = require('crypto');
+const secreto = process.argv[1];
+const idMedico = 'm1';
+console.log('m1.' + crypto.createHmac('sha256', secreto).update(idMedico).digest('hex'));
+" "EL_VALOR_REAL_DE_TU_SESSION_SECRET"
+```
+
+Copia el resultado, pégalo como cookie `id_medico_sesion` en DevTools → Application/Storage → Cookies de tu sitio en producción, y recarga `/dashboard`.
 
 ### 3. Revisar los logs en vivo de Vercel manualmente
 
