@@ -8,8 +8,9 @@ import type { ApiRespuesta } from '@/types';
  * POST /api/auth/login
  *
  * Recibe `{ usuario, password }`, busca las credenciales en la pestaña
- * "Medicos" (columnas N/O — ver `authRepository.ts`) y, si coinciden,
- * configura la cookie de sesión firmada (`id_medico_sesion`, 7 días) que
+ * "Medicos" (ver `authRepository.ts` — soporta columnas N/O y, como
+ * compatibilidad temporal, K/L) y, si coinciden, configura la cookie de
+ * sesión firmada (`id_medico_sesion`, 7 días) que
  * `src/app/(dashboard)/dashboard/layout.tsx` exige para dejar pasar al panel.
  *
  * Requiere runtime de Node.js: usa `crypto` (firma HMAC) y `bcryptjs`.
@@ -55,14 +56,25 @@ function excedioLimiteDeIntentos(ip: string): boolean {
   return registro.conteo > INTENTOS_MAXIMOS;
 }
 
+/** Extrae `usuario` del body crudo solo para el log — nunca para confiar en su tipo. */
+function extraerUsuarioParaLog(body: unknown): string {
+  if (typeof body === 'object' && body !== null && typeof (body as Record<string, unknown>).usuario === 'string') {
+    return (body as Record<string, unknown>).usuario as string;
+  }
+  return '(no proporcionado)';
+}
+
+// (2) trim() explícito en usuario Y password: espacios/saltos de línea
+// invisibles —típicamente pegados por accidente al escribir la contraseña,
+// o al copiar el usuario desde otro lugar— ya no rompen la comparación.
 function validarInput(body: unknown): { valido: boolean; data?: LoginInput } {
   if (typeof body !== 'object' || body === null) return { valido: false };
 
   const b = body as Record<string, unknown>;
   if (typeof b.usuario !== 'string' || b.usuario.trim().length === 0) return { valido: false };
-  if (typeof b.password !== 'string' || b.password.length === 0) return { valido: false };
+  if (typeof b.password !== 'string' || b.password.trim().length === 0) return { valido: false };
 
-  return { valido: true, data: { usuario: b.usuario.trim(), password: b.password } };
+  return { valido: true, data: { usuario: b.usuario.trim(), password: b.password.trim() } };
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<ApiRespuesta<{ id_medico: string }>>> {
@@ -86,25 +98,51 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespue
     }
 
     const { valido, data } = validarInput(bodyCrudo);
+
+    // (1) Diagnóstico solicitado — qué recibió el formulario. Deliberadamente
+    // NUNCA se registra la contraseña ni su hash en texto plano: eso sería la
+    // misma fuga de datos que este módulo existe para evitar. Solo se
+    // registra el usuario recibido y si llegó una contraseña no vacía.
+    console.log(
+      `[POST /api/auth/login] Intento recibido — usuario="${extraerUsuarioParaLog(bodyCrudo)}", ` +
+        `password recibido=${valido ? 'sí' : 'no o vacío'}.`,
+    );
+
     if (!valido || !data) {
       return NextResponse.json({ ok: false, error: 'Usuario y contraseña son requeridos.' }, { status: 400 });
     }
 
+    // El detalle de qué filas/columnas se leyeron de "Medicos" se registra
+    // dentro de `buscarCredencialesPorUsuario` (authRepository.ts) — ahí vive
+    // la lectura real de la hoja.
     const credencial = await buscarCredencialesPorUsuario(data.usuario);
     if (!credencial) {
+      console.log(`[POST /api/auth/login] Sin coincidencia para usuario="${data.usuario}".`);
       return NextResponse.json({ ok: false, error: MENSAJE_ERROR_GENERICO }, { status: 401 });
     }
 
     const passwordValido = await verificarPassword(data.password, credencial.password_hash);
+    console.log(
+      `[POST /api/auth/login] Usuario encontrado (id_medico="${credencial.id_medico}"). ` +
+        `Contraseña válida=${passwordValido}.`,
+    );
+
     if (!passwordValido) {
       return NextResponse.json({ ok: false, error: MENSAJE_ERROR_GENERICO }, { status: 401 });
     }
 
+    // (3) Cookie de sesión robusta e independiente de cualquier variable
+    // DEMO_*: `configurarCookieSesion` firma con HMAC (SESSION_SECRET) el
+    // `id_medico` que acaba de resolver `buscarCredencialesPorUsuario` desde
+    // la hoja — no lee, ni le importa, ninguna variable de entorno DEMO_*
+    // (esa lógica se eliminó por completo del proyecto en el módulo anterior;
+    // ver `src/utils/session.ts`, que ya no la menciona en ninguna parte).
     const respuesta = NextResponse.json(
       { ok: true, data: { id_medico: credencial.id_medico } },
       { status: 200 },
     );
     configurarCookieSesion(respuesta, credencial.id_medico);
+    console.log(`[POST /api/auth/login] Cookie de sesión configurada para id_medico="${credencial.id_medico}".`);
     return respuesta;
   } catch (error) {
     console.error('[POST /api/auth/login] Error inesperado:', error);

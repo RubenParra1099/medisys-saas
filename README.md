@@ -111,6 +111,15 @@ Si la columna O no contiene un hash bcrypt (`$2a$`/`$2b$`/`$2y$`), `src/utils/pa
 compara como texto plano (en tiempo constante) y deja un `console.warn` — sirve para
 probar rápido, pero migra a bcrypt antes de dar acceso a médicos reales.
 
+> ⚠️ **Si pusiste `usuario_login`/`password_hash` en K/L en vez de N/O**: el login
+> sigue funcionando — `authRepository.ts` cae a K/L como compatibilidad temporal si
+> no encuentra coincidencia en N/O (y lo deja registrado con `console.warn` en los
+> logs de Vercel) — pero **esos mismos valores se muestran públicamente** en
+> `/medicos/[id]` como "Cédula profesional" y "Dirección" (`DoctorProfileCard.tsx`).
+> Entra a la página pública de tu médico ahora mismo y verifica si tu correo o
+> contraseña aparecen ahí. Si es así, corta el contenido de K y L, pégalo en N y O,
+> y borra K/L (o pon ahí la cédula/dirección reales) lo antes posible.
+
 **Flujo**:
 
 1. `POST /api/auth/login` recibe `{ usuario, password }`, busca las credenciales con
