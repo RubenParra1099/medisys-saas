@@ -26,6 +26,10 @@ medisys-saas/
     │   │       └── [id]/
     │   │           └── page.tsx             # Perfil público + calendario de reserva
     │   │
+    │   ├── (auth)/                          # Grupo de rutas públicas de acceso
+    │   │   └── login/
+    │   │       └── page.tsx                 # ✅ Login del médico (usuario/contraseña)
+    │   │
     │   ├── (dashboard)/                     # Grupo de rutas privadas (médico autenticado)
     │   │   └── dashboard/                   # Ruta unificada con la config real de Vercel
     │   │       ├── layout.tsx               # Layout con guard de sesión/suscripción + Sidebar
@@ -47,6 +51,11 @@ medisys-saas/
     │       │       └── route.ts             # Stub — calcula huecos libres desde horario_config
     │       ├── medicos/
     │       │   └── route.ts                 # Stub — listado/búsqueda con filtros
+    │       ├── auth/
+    │       │   ├── login/
+    │       │   │   └── route.ts             # ✅ Valida credenciales + configura cookie firmada
+    │       │   └── logout/
+    │       │       └── route.ts             # ✅ Borra la cookie de sesión
     │       └── webhooks/
     │           └── pagos/
     │               └── route.ts             # Stub — webhook de pasarela de pago (Stripe/Conekta)

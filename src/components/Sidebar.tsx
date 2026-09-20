@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import type { ComponentType } from 'react';
 import {
   Building2,
@@ -10,6 +11,8 @@ import {
   FileText,
   Globe,
   Image as ImageIcon,
+  Loader2,
+  LogOut,
   Mail,
   MessageCircle,
   BellRing,
@@ -38,6 +41,22 @@ interface SidebarProps {
 /** Menú lateral fijo del panel administrativo — look & feel SaaS médico premium. */
 export function Sidebar({ idMedico, contadorAgendaHoy = 0, nombreClinica = 'MediSys' }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
+
+  // No se pidió explícitamente, pero sin esto no hay forma de salir de la
+  // sesión una vez que el login está activo (bonus natural del Paso 2).
+  async function manejarLogout(): Promise<void> {
+    setCerrandoSesion(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('[Sidebar] Error al cerrar sesión:', error);
+    } finally {
+      router.push('/login');
+      router.refresh();
+    }
+  }
 
   const seccionClinica: EnlaceNav[] = [
     { etiqueta: 'Agenda Médica', href: '/dashboard', icono: CalendarClock, contador: contadorAgendaHoy },
@@ -133,6 +152,20 @@ export function Sidebar({ idMedico, contadorAgendaHoy = 0, nombreClinica = 'Medi
           </span>
           Google Sheets: Conectado
         </div>
+
+        <button
+          type="button"
+          onClick={manejarLogout}
+          disabled={cerrandoSesion}
+          className="mt-3 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
+        >
+          {cerrandoSesion ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4 shrink-0" />
+          )}
+          Cerrar sesión
+        </button>
       </div>
     </aside>
   );

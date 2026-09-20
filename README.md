@@ -35,6 +35,10 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   herramientas de diagnóstico para encontrar la causa exacta de un 401/403 contra
   Google Sheets, en local y en el propio despliegue de Vercel (ver sección
   "Diagnóstico de conexión a Google Sheets" abajo).
+- `src/app/(auth)/login/page.tsx` + `LoginForm.tsx` + `src/app/api/auth/login/route.ts`
+  + `logout/route.ts` — login real con contraseña (reemplaza a `DEMO_ID_MEDICO`), cookie
+  de sesión firmada con HMAC, y guard de sesión en `(dashboard)/dashboard/layout.tsx`
+  (ver sección "Autenticación de médicos" abajo).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -70,16 +74,80 @@ a `POST /api/dashboard/actualizar-estatus` con `{ id_cita, estatus }`. El endpoi
    segundo caso no se pidió explícitamente, pero se agregó porque el paciente
    siempre debe saber si su cita fue cancelada).
 
-**Sesión del médico (placeholder sin auth real)**: como todavía no hay login,
-`src/utils/session.ts` resuelve el `id_medico` activo desde la cookie
-`id_medico_sesion` o la variable de entorno `DEMO_ID_MEDICO`. Configura esta última en
-Vercel (o en `.env.local`) para poder ver el dashboard mientras se integra
-autenticación real (NextAuth/Auth.js, Clerk, etc.) — `src/app/(dashboard)/dashboard/layout.tsx`
-ya tiene el `TODO` marcado en el lugar exacto donde debe ir ese guard.
+**Sesión del médico**: `src/utils/session.ts` resuelve el `id_medico` activo desde la
+cookie firmada `id_medico_sesion` (ver sección "Autenticación de médicos" abajo). El
+placeholder `DEMO_ID_MEDICO` ya no existe — sin sesión válida, el layout redirige a
+`/login`.
 
 **Nota de rendimiento**: `listarCitasPorMedico` está envuelta en `cache()` de React,
 por lo que el layout (contador del Sidebar) y la página de Agenda comparten una sola
 lectura a Google Sheets por petición en vez de duplicarla.
+
+## Autenticación de médicos (`/login`)
+
+Sistema de login con usuario/contraseña que reemplaza por completo al placeholder
+`DEMO_ID_MEDICO`. Todo el árbol `/dashboard/*` queda protegido: sin sesión válida,
+`src/app/(dashboard)/dashboard/layout.tsx` redirige a `/login` antes de renderizar
+nada (ni de tocar Google Sheets).
+
+**Columnas de credenciales en "Medicos"**: el requisito original pedía las columnas K
+(`usuario_login`) y L (`password_hash`), pero esas dos ya estaban en uso desde el
+módulo del portal público (`cedula_profesional` y `direccion` — ver "Columnas
+opcionales recomendadas" abajo). Para no romper esas columnas, las credenciales se
+agregaron al final de la hoja:
+
+| Columna | Campo | Uso |
+|---|---|---|
+| N | `usuario_login` | Correo o usuario con el que el médico inicia sesión |
+| O | `password_hash` | Hash bcrypt de la contraseña (o texto plano solo para pruebas) |
+
+Genera un hash real para pegar en la columna O con:
+
+```bash
+npm run generar:password-hash -- "la-contraseña-del-medico"
+```
+
+Si la columna O no contiene un hash bcrypt (`$2a$`/`$2b$`/`$2y$`), `src/utils/password.ts`
+compara como texto plano (en tiempo constante) y deja un `console.warn` — sirve para
+probar rápido, pero migra a bcrypt antes de dar acceso a médicos reales.
+
+**Flujo**:
+
+1. `POST /api/auth/login` recibe `{ usuario, password }`, busca las credenciales con
+   `authRepository.buscarCredencialesPorUsuario` (independiente de `medicosRepository.ts`
+   — el hash nunca pasa por el tipo `Medico` compartido con la UI) y verifica la
+   contraseña con `verificarPassword`.
+2. Si coinciden, configura la cookie `id_medico_sesion` **firmada con HMAC-SHA256**
+   (`SESSION_SECRET`), `httpOnly`, `sameSite=lax`, `secure` en producción, con
+   expiración de 7 días.
+3. `obtenerIdMedicoSesion()` valida esa firma en cada request; si la cookie no existe,
+   está corrupta, fue forjada a mano, o `SESSION_SECRET` no está configurado, se trata
+   como "sin sesión" (falla cerrado) en vez de confiar en un id sin firma.
+4. `POST /api/auth/logout` borra la cookie — hay un botón "Cerrar sesión" al final del
+   Sidebar (no se pidió explícitamente, pero un login sin logout deja atrapado al
+   médico).
+
+**Por qué firmar la cookie**: es `httpOnly` (JavaScript del navegador no puede leerla
+ni editarla), pero eso no evita que alguien la fabrique a mano con un cliente HTTP
+(`Cookie: id_medico_sesion=OTRO_ID`) para suplantar a otro médico. La firma HMAC hace
+que una cookie sin la firma correcta se rechace de inmediato.
+
+**Por qué el guard vive en el layout y no en `middleware.ts`**: la verificación de
+firma usa el módulo `crypto` de Node (`createHmac`/`timingSafeEqual`), que no está
+disponible en el Edge Runtime donde corre el middleware de Next.js por defecto.
+Moverlo ahí es posible reescribiéndolo con la Web Crypto API (`crypto.subtle`), pero no
+es necesario: el layout ya bloquea el acceso antes de leer Google Sheets.
+
+**Límite de intentos de login**: `POST /api/auth/login` incluye un límite básico (5
+intentos / 15 min por IP) en memoria del proceso serverless — es una mitigación
+best-effort contra fuerza bruta trivial, no un rate limiter real (no persiste entre
+cold starts ni se comparte entre instancias). Para tráfico serio, mover esto a Vercel
+KV / Upstash Redis delante del handler.
+
+**Variable de entorno requerida**: `SESSION_SECRET` (ver `.env.example`) — sin ella,
+`obtenerIdMedicoSesion()` trata cualquier cookie como inválida (falla cerrado) y nadie
+puede entrar al dashboard. Genera un valor con `openssl rand -hex 32` y nunca lo
+reutilices entre entornos.
 
 ## Diagnóstico de conexión a Google Sheets (401 / 403 en producción)
 
@@ -162,6 +230,8 @@ Además de las columnas A-I del esquema original, la UI usa estas columnas opcio
 | K | `cedula_profesional` | Mostrada en la tarjeta de perfil del portal público |
 | L | `direccion` | Mostrada en la tarjeta de perfil (si falta, se usa `ciudad`) |
 | M | `calificacion` | Estrella dorada en la tarjeta de perfil (si falta, se muestra 5.0) |
+| N | `usuario_login` | Correo/usuario de acceso al dashboard (ver "Autenticación de médicos") |
+| O | `password_hash` | Hash bcrypt de la contraseña (o texto plano solo para pruebas) |
 
 ## Estrategia anti-colisión (dos pacientes reservando el mismo horario)
 

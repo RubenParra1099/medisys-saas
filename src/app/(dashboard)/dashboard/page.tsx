@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { CitasTable } from '@/components/CitasTable';
 import { ResumenAgendaCards } from '@/components/ResumenAgendaCards';
 import type { Cita } from '@/types';
@@ -21,27 +22,12 @@ import { obtenerIdMedicoSesion } from '@/utils/session';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  // El médico "m1" es, por ahora, el único id resuelto por `session.ts`
-  // (cookie `id_medico_sesion` o variable de entorno `DEMO_ID_MEDICO=m1` en
-  // Vercel/.env.local) mientras no exista login real — ver el TODO en
-  // `src/app/(dashboard)/dashboard/layout.tsx`. Se usa ese helper en vez de
-  // escribir el literal "m1" aquí para que el día que haya autenticación,
-  // este archivo no necesite ningún cambio.
   const idMedico = obtenerIdMedicoSesion();
 
   if (!idMedico) {
-    return (
-      <main className="p-6 lg:p-8">
-        <h1 className="text-xl font-semibold text-slate-800">Agenda Médica</h1>
-        <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-500">
-            No hay una sesión de médico activa. Configura la variable de entorno{' '}
-            <code className="rounded bg-slate-100 px-1.5 py-0.5">DEMO_ID_MEDICO=m1</code> (o la cookie{' '}
-            <code className="rounded bg-slate-100 px-1.5 py-0.5">id_medico_sesion</code>) para ver el panel de este médico.
-          </p>
-        </div>
-      </main>
-    );
+    // No debería ocurrir: `layout.tsx` ya redirige a /login antes de llegar
+    // aquí si no hay sesión válida. Se deja como defensa en profundidad.
+    redirect('/login');
   }
 
   // Lectura en vivo de Google Sheets — sin caché entre despliegues gracias a

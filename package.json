@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "diagnostico:sheets": "node scripts/test-conexion-sheets.mjs"
+    "diagnostico:sheets": "node scripts/test-conexion-sheets.mjs",
+    "generar:password-hash": "node scripts/generar-password-hash.mjs"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "googleapis": "^140.0.1",
     "lucide-react": "^0.475.0",
     "next": "^14.2.5",
@@ -18,6 +20,7 @@
     "resend": "^3.5.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.9",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
