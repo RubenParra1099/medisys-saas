@@ -79,6 +79,28 @@ Ver el mapa completo de carpetas en [`ARQUITECTURA.md`](./ARQUITECTURA.md).
   control con interruptores de auto-guardado para elegir la anticipación de los
   recordatorios automáticos, persistidos como columna JSON opcional en "Medicos" (ver
   sección "Recordatorios de Citas" abajo).
+- `src/app/(dashboard)/dashboard/historial/page.tsx` + `TimelineHistorial.tsx` +
+  `ModalNotaEvolucion.tsx` + `src/utils/historialClinicoRepository.ts` +
+  `src/app/api/historial/crear/route.ts` — Historial Clínico: Timeline de consultas
+  anteriores del paciente + formulario flotante "Agregar Nota de Evolución",
+  persistido en la pestaña "Historiales_Clinicos" de Google Sheets (ver sección
+  "Historial Clínico, Cotizador de Presupuestos y Galería Clínica" abajo).
+- `src/app/(dashboard)/dashboard/cotizador/page.tsx` + `PanelCotizador.tsx` +
+  `ConstructorPresupuesto.tsx` + `ListaPresupuestos.tsx` +
+  `src/utils/presupuestosRepository.ts` + `src/app/api/presupuestos/{crear,pasar-a-cuenta}/route.ts`
+  — Cotizador de Presupuestos: generador de presupuestos por tratamiento con subtotal/
+  total en vivo, guardado en la pestaña "Presupuestos_Detallados", y botón "Pasar a
+  Estado de Cuenta" que envía el total a "Saldos" (ver sección homónima abajo — no
+  confundir con "Documentos & Saldos", el ledger de `/dashboard/documentos`).
+- `src/app/(dashboard)/dashboard/galeria/page.tsx` + `GridGaleria.tsx` +
+  `ModalSubirImagen.tsx` + `src/utils/galeriaRepository.ts` +
+  `src/app/api/galeria/subir/route.ts` — Galería Clínica: grid de tarjetas con
+  radiografías/fotos organizadas por fecha + carga simulada (URL de placeholder),
+  persistida en la pestaña "Galeria_Clinica" de Google Sheets (ver sección homónima
+  abajo).
+- `src/components/pacientes/BuscadorPacienteClinico.tsx` — buscador de paciente
+  compartido por los tres módulos anteriores (generaliza
+  `BuscadorPacienteFinanciero.tsx` con un prop `baseHref`).
 - Resto del árbol (`hooks/`, secciones del Sidebar aún sin lógica) — stubs con
   comentarios `TODO` para que el proyecto compile y sirva como punto de partida
   inmediato; todas las rutas del menú lateral existen (sin 404) aunque su contenido
@@ -350,7 +372,8 @@ por nombre completo O por cualquier hallazgo de alergia/condición — sin ning�
 Columnas: **ID** (badge mono), **Nombre Completo**, **Teléfono/WhatsApp** (número con
 link `tel:` + botón redondo que abre `https://wa.me/<dígitos>`), **Correo Electrónico**
 (link `mailto:` o un guión si el paciente no dejó correo), **Alergias/Condiciones**
-(ver abajo) y **Acciones** (botón "Ver Odontograma").
+(ver abajo) y **Acciones** (botones "Ver Odontograma", "Historial", "Cotizador",
+"Galería" y "Saldos" — ver la nota de renombrado más abajo).
 
 **Columna "Alergias/Condiciones"** (`hallazgosClinicos.ts`): como `antecedentes_medicos`
 es hoy un solo campo de texto libre (ver la nota de precisión en la sección anterior),
@@ -372,6 +395,128 @@ catálogo clínico cerrado):
 literal de diente/muela, así que se reutilizó el mismo ícono que ya representa
 "Odontograma IA" en el `Sidebar`, por consistencia visual, en vez de forzar un glifo
 no relacionado.
+
+**⚠️ Nota de renombrado (esta entrega):** el botón que hasta la entrega anterior se
+llamaba "Cotizador" y navegaba a `/dashboard/documentos` (el ledger de saldos) se
+renombró a **"Saldos"** — mismo ícono `Wallet`, mismo destino, sin cambios de
+comportamiento. Se renombró porque ahora sí existe un módulo real llamado
+"Cotizador de Presupuestos" (`/dashboard/cotizador`, ver más abajo) y el nombre viejo
+se había vuelto ambiguo/confuso. Se agregaron tres botones nuevos: **"Historial"**
+(`/dashboard/historial`, ícono `FileText`), **"Cotizador"** (`/dashboard/cotizador`,
+ícono `Calculator`) y **"Galería"** (`/dashboard/galeria`, ícono `Image`).
+
+## Historial Clínico, Cotizador de Presupuestos y Galería Clínica (esta entrega)
+
+> **Nota de precisión:** el enunciado de esta entrega pedía reemplazar los
+> marcadores "Pendiente de implementar" en rutas anidadas
+> `src/app/(dashboard)/dashboard/pacientes/[id]/historial|cotizador|galeria/page.tsx`.
+> Esas rutas **no existen** en el proyecto — los ítems reales del `<Sidebar />`
+> ("Historial Clínico", "Cotizador Presupuestos", "Galería Clínica") apuntan a las
+> rutas planas `/dashboard/historial`, `/dashboard/cotizador` y `/dashboard/galeria`,
+> que eran los stubs grises que sí existían y son los que se reemplazan aquí. Los
+> tres siguen el mismo patrón exacto que `/dashboard/documentos` (buscador de
+> paciente por `?id=`, `force-dynamic`, degradación con `.catch()` si Sheets falla).
+
+**No confundir** "Cotizador de Presupuestos" (`/dashboard/cotizador`, este módulo,
+el GENERADOR de presupuestos por tratamiento) con "Cotizador de Presupuestos y
+Control de Abonos" (`/dashboard/documentos`, el LEDGER de cargos/abonos ya
+generados) — ver la nota de renombrado justo arriba.
+
+### ⚠️ Pasos manuales requeridos en tu Google Sheet
+
+Crea estas 3 pestañas nuevas, con estos encabezados exactos en la Fila 1:
+
+**"Historiales_Clinicos"** (append-only — cada nota de evolución es una fila nueva):
+
+```
+id_historial | id_paciente | id_medico | fecha | motivo_consulta | diagnostico | tratamiento_sugerido | notas_privadas
+```
+
+**"Presupuestos_Detallados"** (append-only, salvo la columna `estatus`, que sí se
+actualiza en el lugar de `'Borrador'` a `'Aceptado'`):
+
+```
+id_presupuesto | id_paciente | id_medico | fecha | items_json | descuento | total_mxn | estatus
+```
+
+**"Galeria_Clinica"** (append-only; a propósito **no** tiene columna `id_medico` —
+así se especificó — el acceso queda acotado porque solo se llega aquí a través de un
+`id_paciente` ya resuelto por `obtenerPacientePorId`, que sí filtra por médico en el
+resto de la app):
+
+```
+id_foto | id_paciente | fecha | descripcion | imagen_url | tipo_archivo
+```
+
+### Historial Clínico (`/dashboard/historial`)
+
+Mesa de notas médicas: `TimelineHistorial.tsx` (`'use client'`) muestra una línea del
+tiempo con las consultas anteriores del paciente (más reciente primero — el servidor
+invierte el orden de inserción, no ordena por fecha, para que varias notas del mismo
+día conserven su orden real de captura). El botón "Agregar Nota de Evolución" abre
+`ModalNotaEvolucion.tsx`, un formulario flotante que captura motivo de consulta,
+diagnóstico, tratamiento sugerido y notas privadas, y los guarda vía
+`POST /api/historial/crear` (401 sin sesión, 400 si algún campo requerido mide menos
+de 3 caracteres).
+
+> **Sustitución pragmática documentada:** el enunciado pedía "campos de texto
+> enriquecidos" (rich-text). Este proyecto no tenía ninguna dependencia de editor de
+> texto enriquecido, y agregar una solo para este formulario sería una dependencia
+> pesada para un único módulo — se usan `<textarea>` amplios y bien estilizados como
+> sustituto. Si más adelante se necesita texto enriquecido real (negritas, listas),
+> una opción ligera sería `@tiptap/react` o `react-quill`.
+
+`notas_privadas` nunca se muestra en el portal público ni en ninguna vista orientada
+al paciente — es exclusivamente interno.
+
+### Cotizador de Presupuestos (`/dashboard/cotizador`)
+
+`PanelCotizador.tsx` (`'use client'`) une dos piezas bajo un estado compartido de la
+lista de presupuestos del paciente (existe porque `page.tsx`, un Server Component, no
+puede pasar funciones directamente a sus hijos `'use client'`):
+
+- **`ConstructorPresupuesto.tsx`**: el dentista agrega filas de tratamiento (nombre
+  con sugerencias vía `<datalist>`, pieza dental FDI opcional, costo unitario en MXN,
+  cantidad), ve el subtotal por fila y el total en vivo (aplicando el descuento), y
+  "Guardar Presupuesto" hace `POST /api/presupuestos/crear` — siempre crea el registro
+  como `'Borrador'`. El total mostrado en vivo usa una copia cliente-segura de
+  `calcularTotalPresupuesto` (`components/cotizador/tipos.ts`); el total que
+  realmente se guarda en Sheets **siempre** lo recalcula el servidor
+  (`presupuestosRepository.ts`) — nunca se confía en un total mandado por el cliente.
+- **`ListaPresupuestos.tsx`**: presupuestos ya guardados (más reciente primero), con
+  badge **Borrador** (ámbar) o **Aceptado** (verde). Cada presupuesto en Borrador
+  tiene un botón **"Pasar a Estado de Cuenta"**.
+
+**API: `POST /api/presupuestos/pasar-a-cuenta`** — el puente explícito pedido entre
+este módulo y "Documentos & Saldos": valida que el presupuesto pertenezca al médico
+en sesión (**404** si no — nunca debe poder empujarse a Saldos un presupuesto de otro
+consultorio), que no esté ya `'Aceptado'` (**409** — evita que un doble clic o un
+reintento de red genere dos cargos duplicados) y que `total_mxn > 0` (**400**).
+Si todo procede, inserta un movimiento tipo `'Presupuesto'` en la pestaña "Saldos"
+(reutilizando `crearMovimientoFinanciero` de `saldosRepository.ts`, sin duplicar esa
+lógica) y marca el presupuesto como `'Aceptado'`.
+
+### Galería Clínica (`/dashboard/galeria`)
+
+`GridGaleria.tsx` (`'use client'`) muestra un grid de tarjetas (1/2/3 columnas según
+el ancho de pantalla) con las radiografías y fotos del paciente, más reciente
+primero, cada una con su badge de tipo (**Radiografía** en índigo, **Fotografía**
+en blanco), descripción y fecha. El botón "Subir Imagen" abre `ModalSubirImagen.tsx`.
+
+> **Simulación de carga documentada:** no existe todavía infraestructura real de
+> carga de archivos en este proyecto. Tal como se pidió ("simule la carga del
+> archivo, capture una URL de prueba"), el modal solo captura la descripción y el
+> tipo de archivo; `POST /api/galeria/subir` → `agregarFoto()`
+> (`galeriaRepository.ts`) genera una URL de placeholder determinística
+> (`https://picsum.photos/seed/<id_foto>/480/360`, sembrada con el `id_foto` recién
+> generado) — la misma imagen se muestra en cada recarga de esa fila, no una imagen
+> aleatoria distinta en cada visita. Para carga de archivos real en el futuro, la
+> opción más simple sobre esta misma arquitectura (Vercel + Sheets) es Vercel Blob o
+> Cloudinary, guardando la URL resultante en la misma columna `imagen_url`.
+>
+> Las imágenes se renderizan con `next/image` (`unoptimized`, ya que
+> `next.config.js` permite cualquier hostname `https://**` — ver la nota en
+> `DoctorProfileCard.tsx`).
 
 ### Página (`page.tsx`)
 
@@ -867,7 +1012,28 @@ plantilla original; ver la sección "Cotizador de Presupuestos y Control de Abon
 arriba para el detalle completo:
 `id_transaccion (TX-12345) | id_paciente | id_medico | fecha (YYYY-MM-DD) | concepto | tipo ("Presupuesto" | "Abono") | monto | notas`
 
-La fila 1 de las cinco pestañas debe ser encabezados (el código lee a partir de la fila 2).
+**Pestaña "Consultorios"** (columnas A–F) — **debes crearla a mano**; ver la sección
+"Mi Consultorio" arriba para el detalle completo:
+`id_medico | nombre_clinica | telefono_comercial | direccion_fisica | dias_atencion | horas_atencion_json`
+
+**Pestaña "Usuarios_Autorizados"** (columnas A–D) — **debes crearla a mano**; ver la
+sección "Correos Autorizados" arriba para el detalle completo:
+`id_autorizacion (INV-12345) | id_medico_principal | correo_invitado | rol ("Asistente" | "Socio")`
+
+**Pestaña "Historiales_Clinicos"** (columnas A–H) — **debes crearla a mano**; ver la
+sección "Historial Clínico" arriba para el detalle completo:
+`id_historial (HIST-12345) | id_paciente | id_medico | fecha (YYYY-MM-DD) | motivo_consulta | diagnostico | tratamiento_sugerido | notas_privadas`
+
+**Pestaña "Presupuestos_Detallados"** (columnas A–H) — **debes crearla a mano**; ver la
+sección "Cotizador de Presupuestos" arriba para el detalle completo:
+`id_presupuesto (PRE-12345) | id_paciente | id_medico | fecha (YYYY-MM-DD) | items_json | descuento | total_mxn | estatus ("Borrador" | "Aceptado")`
+
+**Pestaña "Galeria_Clinica"** (columnas A–F) — **debes crearla a mano**; ver la sección
+"Galería Clínica" arriba para el detalle completo (nota: a propósito no tiene columna
+`id_medico`):
+`id_foto (IMG-12345) | id_paciente | fecha (YYYY-MM-DD) | descripcion | imagen_url | tipo_archivo ("Radiografia" | "Fotografia")`
+
+La fila 1 de todas las pestañas debe ser encabezados (el código lee a partir de la fila 2).
 
 ## Configuración de variables de entorno en Vercel
 

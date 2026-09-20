@@ -50,9 +50,14 @@ medisys-saas/
     │   │       │   └── page.tsx             # ✅ Correos Autorizados (monta <ListaUsuariosAutorizados />)
     │   │       ├── recordatorios/
     │   │       │   └── page.tsx             # ✅ Recordatorios de Citas (monta <MesaControlRecordatorios />)
-    │   │       ├── whatsapp/, cotizador/,
-    │   │       │   historial/, galeria/
-    │   │       │       └── page.tsx         # Stubs — secciones del Sidebar aún sin lógica
+    │   │       ├── historial/
+    │   │       │   └── page.tsx             # ✅ Historial Clínico (monta <TimelineHistorial />)
+    │   │       ├── cotizador/
+    │   │       │   └── page.tsx             # ✅ Cotizador de Presupuestos (monta <PanelCotizador />)
+    │   │       ├── galeria/
+    │   │       │   └── page.tsx             # ✅ Galería Clínica (monta <GridGaleria />)
+    │   │       ├── whatsapp/
+    │   │       │   └── page.tsx             # Stub — sección del Sidebar aún sin lógica
     │   │
     │   └── api/                             # Serverless Functions (Vercel)
     │       ├── booking/
@@ -89,6 +94,17 @@ medisys-saas/
     │       ├── recordatorios/
     │       │   └── actualizar/
     │       │       └── route.ts             # ✅ POST — sobrescribe columna P (JSON) de "Medicos" (N/O son login, intocables)
+    │       ├── historial/
+    │       │   └── crear/
+    │       │       └── route.ts             # ✅ POST — inserta una fila en "Historiales_Clinicos"
+    │       ├── presupuestos/
+    │       │   ├── crear/
+    │       │   │   └── route.ts             # ✅ POST — inserta una fila en "Presupuestos_Detallados" (siempre 'Borrador')
+    │       │   └── pasar-a-cuenta/
+    │       │       └── route.ts             # ✅ POST — marca 'Aceptado' + inserta cargo en "Saldos" (404/409 guards)
+    │       ├── galeria/
+    │       │   └── subir/
+    │       │       └── route.ts             # ✅ POST — inserta una fila en "Galeria_Clinica" (URL de placeholder)
     │       └── webhooks/
     │           └── pagos/
     │               └── route.ts             # Stub — webhook de pasarela de pago (Stripe/Conekta)
@@ -117,7 +133,8 @@ medisys-saas/
     │   │   ├── FormularioNuevoPaciente.tsx   # Orquestador 'use client' — estado + fetch + redirect
     │   │   ├── hallazgosClinicos.ts          # separarHallazgos() + clasificarHallazgo() (badges de la tabla)
     │   │   ├── KpisPacientes.tsx             # 3 tarjetas ejecutivas (server component, sin 'use client')
-    │   │   └── TablaPacientes.tsx            # Orquestador 'use client' — buscador + tabla clínica + acciones (Odontograma/Cotizador)
+    │   │   ├── TablaPacientes.tsx            # Orquestador 'use client' — buscador + tabla clínica + 5 acciones (Odontograma/Historial/Cotizador/Galería/Saldos)
+    │   │   └── BuscadorPacienteClinico.tsx   # ✅ Buscador/selector de paciente genérico (prop `baseHref`) — usado por Historial/Cotizador/Galería
     │   ├── documentos/                       # ✅ Cotizador de Presupuestos y Control de Abonos
     │   │   ├── tipos.ts                      # calcularResumenFinanciero() + ESTILOS_TIPO_MOVIMIENTO + formatearMoneda()
     │   │   ├── KpisFinancieros.tsx           # 3 tarjetas ejecutivas (server component, sin 'use client')
@@ -129,8 +146,19 @@ medisys-saas/
     │   ├── correos/                          # ✅ Correos Autorizados
     │   │   ├── ListaUsuariosAutorizados.tsx  # Orquestador 'use client' — lista + botón que abre <ModalInvitarUsuario />
     │   │   └── ModalInvitarUsuario.tsx       # Modal — captura correo + rol y POST de la invitación
-    │   └── recordatorios/                    # ✅ Recordatorios de Citas
-    │       └── MesaControlRecordatorios.tsx  # Orquestador 'use client' — toggles con auto-guardado + toast
+    │   ├── recordatorios/                    # ✅ Recordatorios de Citas
+    │   │   └── MesaControlRecordatorios.tsx  # Orquestador 'use client' — toggles con auto-guardado + toast
+    │   ├── historial/                        # ✅ Historial Clínico
+    │   │   ├── TimelineHistorial.tsx         # Orquestador 'use client' — Timeline + botón que abre <ModalNotaEvolucion />
+    │   │   └── ModalNotaEvolucion.tsx        # Formulario flotante — captura + POST de la nota de evolución
+    │   ├── cotizador/                         # ✅ Cotizador de Presupuestos
+    │   │   ├── tipos.ts                      # calcularTotalPresupuesto() cliente-seguro + formatearMoneda() + sugerencias
+    │   │   ├── PanelCotizador.tsx             # Envoltorio 'use client' — une Constructor+Lista bajo un estado compartido
+    │   │   ├── ConstructorPresupuesto.tsx    # Filas de tratamiento + subtotal/total en vivo + POST "Guardar Presupuesto"
+    │   │   └── ListaPresupuestos.tsx         # Lista con badges Borrador/Aceptado + POST "Pasar a Estado de Cuenta"
+    │   └── galeria/                           # ✅ Galería Clínica
+    │       ├── GridGaleria.tsx               # Orquestador 'use client' — grid de tarjetas + botón que abre <ModalSubirImagen />
+    │       └── ModalSubirImagen.tsx          # Modal — simula carga (descripción + tipo) y POST de la referencia
     │
     ├── hooks/
     │   ├── useDisponibilidad.ts             # Consume /api/booking/disponibilidad
@@ -147,6 +175,9 @@ medisys-saas/
         ├── saldosRepository.ts              # ✅ Acceso a datos de la pestaña "Saldos" (Cotizador)
         ├── consultorioRepository.ts         # ✅ Acceso (upsert) a la pestaña "Consultorios"
         ├── usuariosAutorizadosRepository.ts # ✅ Acceso a la pestaña "Usuarios_Autorizados"
+        ├── historialClinicoRepository.ts    # ✅ Acceso a la pestaña "Historiales_Clinicos" (append-only)
+        ├── presupuestosRepository.ts        # ✅ Acceso a "Presupuestos_Detallados" + calcularTotalPresupuesto()
+        ├── galeriaRepository.ts             # ✅ Acceso a "Galeria_Clinica" (genera URL de placeholder)
         ├── edad.ts                          # ✅ calcularEdad() + sugerirDenticionPorEdad()
         ├── validation.ts                    # ✅ Validación estricta de inputs
         └── notifications.ts                 # ✅ WhatsApp (placeholder) + Email (Resend)
